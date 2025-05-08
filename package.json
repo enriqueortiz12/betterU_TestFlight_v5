@@ -12,7 +12,8 @@
     "lint": "expo lint",
     "eas-build-on-success": "echo 'Build succeeded!'",
     "eas-build-on-error": "echo 'Build failed!'",
-    "postinstall": "node ./scripts/patch-expo-podspec.js"
+    "postinstall": "node ./scripts/patch-expo-podspec.js",
+    "prebuild": "EXPO_NO_SOURCEMAP=1 OTHER_CPLUSPLUSFLAGS='-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1' npx expo prebuild"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.0",

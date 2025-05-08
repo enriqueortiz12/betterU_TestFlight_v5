@@ -26,17 +26,11 @@
         "image": "latest",
         "buildConfiguration": "Release",
         "cache": {
-          "key": "ios-production"
+          "key": "clear-cpp-issue-v1"
         },
         "cocoapods": "1.15.2"
       },
-      "env": {
-        "EXPO_NO_SOURCEMAP": "1"
-      },
-      "prebuildCommand": "npx expo prebuild -p ios --clean",
-      "cache": {
-        "disabled": false
-      }
+      "prebuildCommand": "npx expo prebuild -p ios --clean"
     }
   },
   "submit": {

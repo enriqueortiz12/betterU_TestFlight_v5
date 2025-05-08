@@ -17,7 +17,11 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.enriqueortiz.betteru",
-      buildNumber: "5",
+      buildNumber: "7",
+      deploymentTarget: "16.0",
+      useFrameworks: "static",
+      buildConfiguration: "Release",
+      otherCplusplusFlags: "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1",
       infoPlist: {
         NSCameraUsageDescription: "This app uses the camera to let you take profile pictures.",
         NSPhotoLibraryUsageDescription: "This app uses the photo library to let you select profile pictures.",
@@ -42,7 +46,11 @@ export default {
         {
           "ios": {
             "deploymentTarget": "16.0",
-            "useFrameworks": "static"
+            "useFrameworks": "static",
+            "buildConfiguration": "Release",
+            "otherCplusplusFlags": "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1",
+            "clangCxxLanguageStandard": "c++17",
+            "clangCxxLibrary": "libc++"
           }
         }
       ],

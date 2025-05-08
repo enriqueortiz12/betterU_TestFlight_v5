@@ -26,11 +26,11 @@
         "image": "latest",
         "buildConfiguration": "Release",
         "cache": {
-          "key": "clear-cpp-issue-v6"
+          "key": "clear-cpp-issue-v7"
         },
         "cocoapods": "1.15.2",
         "env": {
-          "OTHER_CPLUSPLUSFLAGS": "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1",
+          "OTHER_CPLUSPLUSFLAGS": "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -DFOLLY_HAVE_CLOCK_GETTIME=1",
           "EXPO_NO_SOURCEMAP": "1",
           "RUBY_VERSION": "3.2.2",
           "FASTLANE_VERSION": "2.217.0",
@@ -40,7 +40,8 @@
           "COCOAPODS_DISABLE_STATS": "true",
           "POD_INSTALL_USE_FRAMEWORKS": "static",
           "USE_FRAMEWORKS": "static",
-          "NODE_OPTIONS": "--max-old-space-size=4096"
+          "NODE_OPTIONS": "--max-old-space-size=4096",
+          "FOLLY_VERSION": "2024.01.22.00"
         },
         "credentialsSource": "remote"
       },

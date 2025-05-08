@@ -14,7 +14,9 @@ export const UserProvider = ({ children }) => {
     weight: "",
     height: "",
     goal: "",
-    trainingLevel: "intermediate", // Add default training level
+    trainingLevel: "intermediate",
+    fitness_goal: "",
+    gender: ""
   })
 
   const [personalRecords, setPersonalRecords] = useState([])
@@ -35,6 +37,7 @@ export const UserProvider = ({ children }) => {
         return;
       }
       if (data) {
+        console.log("Profile data from Supabase:", data); // Debug log
         setUserProfile(data);
         await AsyncStorage.setItem('userProfile', JSON.stringify(data));
       }
@@ -51,7 +54,9 @@ export const UserProvider = ({ children }) => {
         // Load profile from AsyncStorage
         const profileData = await AsyncStorage.getItem('userProfile');
         if (profileData) {
-          setUserProfile(JSON.parse(profileData));
+          const parsedProfile = JSON.parse(profileData);
+          console.log("Profile data from AsyncStorage:", parsedProfile); // Debug log
+          setUserProfile(parsedProfile);
         }
         // Load PRs from Supabase
         await loadPersonalRecordsFromSupabase();
@@ -473,20 +478,24 @@ export const UserProvider = ({ children }) => {
   // Add debugPRData to the context value
   const contextValue = {
     userProfile,
-    updateProfile,
+    setUserProfile,
     personalRecords,
-    addPersonalRecord,
-    updatePersonalRecord,
-    deletePersonalRecord,
-    resetPersonalRecords,
+    setPersonalRecords,
     isLoading,
-    debugPRData, // Add this line
+    syncProfileFromSupabase,
+    debugPRData,
   }
 
   return <UserContext.Provider value={contextValue}>{children}</UserContext.Provider>
 }
 
-export const useUser = () => useContext(UserContext)
+export const useUser = () => {
+  const context = useContext(UserContext);
+  if (!context) {
+    throw new Error('useUser must be used within a UserProvider');
+  }
+  return context;
+}
 
 export default { UserProvider, useUser }
 

@@ -98,6 +98,7 @@ export const TrainerProvider = ({ children }) => {
       // Get AI response with user profile
       let aiResponse;
       try {
+        console.log("Sending profile to AI:", userProfile); // Debug log
         const aiResult = await generateAIResponse(message, userProfile);
         aiResponse = aiResult.response || "I'm here to help with your fitness journey!";
       } catch (aiError) {

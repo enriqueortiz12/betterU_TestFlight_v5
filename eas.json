@@ -23,10 +23,10 @@
       "distribution": "store",
       "ios": {
         "resourceClass": "m-medium",
-        "image": "latest",
+        "image": "macos-sequoia-15.3-xcode-16.2",
         "buildConfiguration": "Release",
         "cache": {
-          "key": "clear-cpp-issue-v7"
+          "key": "clear-cpp-issue-v8"
         },
         "cocoapods": "1.15.2",
         "env": {

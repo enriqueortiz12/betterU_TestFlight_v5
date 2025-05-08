@@ -26,7 +26,7 @@
         "image": "latest",
         "buildConfiguration": "Release",
         "cache": {
-          "key": "clear-cpp-issue-v5"
+          "key": "clear-cpp-issue-v6"
         },
         "cocoapods": "1.15.2",
         "env": {
@@ -44,7 +44,7 @@
         },
         "credentialsSource": "remote"
       },
-      "prebuildCommand": "EXPO_NO_SOURCEMAP=1 OTHER_CPLUSPLUSFLAGS='-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1' npx expo prebuild -p ios --clean"
+      "prebuildCommand": "npx expo prebuild -p ios --clean"
     }
   },
   "submit": {

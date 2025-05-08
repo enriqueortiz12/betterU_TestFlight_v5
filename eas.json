@@ -1,0 +1,52 @@
+{
+  "cli": {
+    "version": ">= 5.9.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m-medium",
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "ios": {
+        "resourceClass": "m-medium",
+        "image": "latest",
+        "buildConfiguration": "Release",
+        "cache": {
+          "key": "ios-production"
+        },
+        "cocoapods": "1.15.2"
+      },
+      "env": {
+        "EXPO_NO_SOURCEMAP": "1"
+      },
+      "prebuildCommand": "npx expo prebuild -p ios --clean",
+      "cache": {
+        "disabled": false
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "andyjulijohn@yahoo.com",
+        "ascAppId": "6688642020",
+        "appleTeamId": "3DT3JG9S95",
+        "sku": "betterU_TestFlight_v5"
+      }
+    }
+  }
+} 

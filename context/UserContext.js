@@ -54,14 +54,52 @@ export const UserProvider = ({ children }) => {
         // Load profile from AsyncStorage
         const profileData = await AsyncStorage.getItem('userProfile');
         if (profileData) {
-          const parsedProfile = JSON.parse(profileData);
-          console.log("Profile data from AsyncStorage:", parsedProfile); // Debug log
-          setUserProfile(parsedProfile);
+          try {
+            const parsedProfile = JSON.parse(profileData);
+            console.log("Profile data from AsyncStorage:", parsedProfile); // Debug log
+            setUserProfile(parsedProfile);
+          } catch (parseError) {
+            console.error('Error parsing profile data:', parseError);
+            // If parsing fails, clear the corrupted data
+            await AsyncStorage.removeItem('userProfile');
+          }
         }
-        // Load PRs from Supabase
-        await loadPersonalRecordsFromSupabase();
-        // Sync profile from Supabase
-        await syncProfileFromSupabase();
+
+        // Load PRs from Supabase with retry logic
+        let retryCount = 0;
+        const maxRetries = 3;
+        while (retryCount < maxRetries) {
+          try {
+            await loadPersonalRecordsFromSupabase();
+            break;
+          } catch (error) {
+            console.error(`Error loading PRs (attempt ${retryCount + 1}/${maxRetries}):`, error);
+            retryCount++;
+            if (retryCount === maxRetries) {
+              setPersonalRecords([]);
+            } else {
+              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+            }
+          }
+        }
+
+        // Sync profile from Supabase with retry logic
+        retryCount = 0;
+        while (retryCount < maxRetries) {
+          try {
+            await syncProfileFromSupabase();
+            break;
+          } catch (error) {
+            console.error(`Error syncing profile (attempt ${retryCount + 1}/${maxRetries}):`, error);
+            retryCount++;
+            if (retryCount === maxRetries) {
+              // Keep existing profile data if sync fails
+              console.log('Keeping existing profile data after failed sync');
+            } else {
+              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+            }
+          }
+        }
       } catch (error) {
         console.error('Error loading user data:', error);
         setPersonalRecords([]);
@@ -69,6 +107,7 @@ export const UserProvider = ({ children }) => {
         setIsLoading(false);
       }
     };
+
     loadUserData();
   }, []);
 

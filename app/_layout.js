@@ -6,17 +6,29 @@ import { UnitsProvider } from '../context/UnitsContext';
 import { TrackingProvider } from '../context/TrackingContext';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useState, useEffect } from 'react';
+import { preloadImages } from '../utils/imageUtils';
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Simulate some initialization time
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, 100);
+    const initializeApp = async () => {
+      try {
+        // Preload images
+        await preloadImages();
+        
+        // Give more time for contexts to initialize
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setIsReady(true);
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        // Still set ready to true to prevent infinite loading
+        setIsReady(true);
+      }
+    };
 
-    return () => clearTimeout(timer);
+    initializeApp();
   }, []);
 
   if (!isReady) {
@@ -45,8 +57,8 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
-  },
+    backgroundColor: '#ffffff'
+  }
 }); 

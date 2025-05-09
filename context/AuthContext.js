@@ -119,31 +119,86 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     console.log("AuthContext: Setting up auth state listeners")
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("AuthContext: Initial session check:", session?.user?.id)
-      setSession(session)
-      setUser(session?.user ?? null)
-      setIsLoading(false) // Set loading to false immediately
-    })
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        // Get initial session with retry logic
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        while (retryCount < maxRetries) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (mounted) {
+              console.log("AuthContext: Initial session check:", session?.user?.id);
+              setSession(session);
+              setUser(session?.user ?? null);
+              if (session?.user?.id) {
+                await fetchProfile(session.user.id);
+              }
+            }
+            break;
+          } catch (error) {
+            console.error(`Error getting initial session (attempt ${retryCount + 1}/${maxRetries}):`, error);
+            retryCount++;
+            if (retryCount === maxRetries) {
+              if (mounted) {
+                setSession(null);
+                setUser(null);
+              }
+            } else {
+              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+            }
+          }
+        }
+      } catch (error) {
+        console.error("AuthContext: Error in initializeAuth:", error);
+        if (mounted) {
+          setSession(null);
+          setUser(null);
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("AuthContext: Auth state changed:", _event, session?.user?.id)
-
-      // Always update session and user
-      setSession(session)
-      setUser(session?.user ?? null)
-      setIsLoading(false) // Set loading to false immediately
-    })
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+      
+      console.log("AuthContext: Auth state changed:", _event, session?.user?.id);
+      
+      try {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user?.id) {
+          await fetchProfile(session.user.id);
+        } else {
+          setProfile(null);
+        }
+      } catch (error) {
+        console.error("AuthContext: Error handling auth state change:", error);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    });
 
     return () => {
-      console.log("AuthContext: Cleaning up auth state listeners")
-      subscription.unsubscribe()
-    }
-  }, []) // Remove fetchProfile from dependencies
+      console.log("AuthContext: Cleaning up auth state listeners");
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // Update the signUp function to better handle the auth state:
 

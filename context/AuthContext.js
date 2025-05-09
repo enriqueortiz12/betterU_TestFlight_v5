@@ -322,7 +322,7 @@ export const AuthProvider = ({ children }) => {
   const resetPassword = async (email) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: "betterufitness://reset-password",
+        redirectTo: "betteru://reset-password",
       })
       return { error }
     } catch (error) {

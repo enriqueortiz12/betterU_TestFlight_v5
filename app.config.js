@@ -6,6 +6,7 @@ export default {
     orientation: "portrait",
     icon: "./assets/images/icon.jpg",
     userInterfaceStyle: "light",
+    scheme: "betteru",
     splash: {
       image: "./assets/images/splash-icon.jpg",
       resizeMode: "contain",

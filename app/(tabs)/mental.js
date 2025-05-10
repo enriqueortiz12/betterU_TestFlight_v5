@@ -532,7 +532,7 @@ const MentalScreen = () => {
           {/* Mental Health Resources */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Mental Health Resources</Text>
-            <TouchableOpacity style={styles.resourceCard} onPress={() => Linking.openURL('https://betteruai.com')}>
+            <TouchableOpacity style={styles.resourceCard} onPress={() => Linking.openURL('https://www.who.int/news-room/fact-sheets/detail/adolescent-mental-health')}>
               <Ionicons name="document-text" size={24} color="#00ffff" />
               <View style={styles.resourceContent}>
                 <Text style={styles.resourceTitle}>Mental Health Articles</Text>
@@ -540,7 +540,7 @@ const MentalScreen = () => {
               </View>
               <Ionicons name="chevron-forward" size={24} color="#666" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.resourceCard} onPress={() => Linking.openURL('https://betteruai.com')}>
+            <TouchableOpacity style={styles.resourceCard} onPress={() => Linking.openURL('https://www.samhsa.gov/')}>
               <Ionicons name="call" size={24} color="#ff4444" />
               <View style={styles.resourceContent}>
                 <Text style={styles.resourceTitle}>Crisis Support</Text>
@@ -548,19 +548,11 @@ const MentalScreen = () => {
               </View>
               <Ionicons name="chevron-forward" size={24} color="#666" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.resourceCard} onPress={() => Linking.openURL('https://betteruai.com')}>
+            <TouchableOpacity style={styles.resourceCard} onPress={() => Linking.openURL('https://www.psychologytoday.com/us/therapists')}>
               <Ionicons name="people" size={24} color="#44ff44" />
               <View style={styles.resourceContent}>
                 <Text style={styles.resourceTitle}>Find a Therapist</Text>
                 <Text style={styles.resourceDescription}>Connect with mental health professionals</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color="#666" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.resourceCard} onPress={() => Linking.openURL('https://betteruai.com')}>
-              <Ionicons name="chatbubbles" size={24} color="#4444ff" />
-              <View style={styles.resourceContent}>
-                <Text style={styles.resourceTitle}>Community Support</Text>
-                <Text style={styles.resourceDescription}>Join supportive communities and forums</Text>
               </View>
               <Ionicons name="chevron-forward" size={24} color="#666" />
             </TouchableOpacity>
@@ -598,7 +590,7 @@ const MentalScreen = () => {
               <Text style={styles.modalCloseButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-    </View>
+        </View>
       </Modal>
     </ScrollView>
   );

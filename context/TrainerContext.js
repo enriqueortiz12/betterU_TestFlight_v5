@@ -38,8 +38,11 @@ export const TrainerProvider = ({ children }) => {
 
   // Initialize with a timeout to prevent infinite loading
   useEffect(() => {
+    let isMounted = true;
     const timeoutId = setTimeout(() => {
-      setIsLoading(false);
+      if (isMounted) {
+        setIsLoading(false);
+      }
     }, 5000); // 5 second timeout
 
     const initConversations = async () => {
@@ -48,9 +51,9 @@ export const TrainerProvider = ({ children }) => {
         await checkAndResetMessageCount();
 
         const savedConversations = await AsyncStorage.getItem("trainerConversations");
-        if (savedConversations) {
+        if (savedConversations && isMounted) {
           setConversations(JSON.parse(savedConversations));
-        } else {
+        } else if (isMounted) {
           const initialMessage = {
             id: Date.now().toString(),
             sender: "trainer",
@@ -62,20 +65,27 @@ export const TrainerProvider = ({ children }) => {
         }
       } catch (error) {
         console.error("Error loading conversations:", error);
-        const initialMessage = {
-          id: Date.now().toString(),
-          sender: "trainer",
-          message: "Hello! I'm your AI trainer. How can I help you today?",
-          timestamp: new Date().toISOString(),
-        };
-        setConversations([initialMessage]);
+        if (isMounted) {
+          const initialMessage = {
+            id: Date.now().toString(),
+            sender: "trainer",
+            message: "Hello! I'm your AI trainer. How can I help you today?",
+            timestamp: new Date().toISOString(),
+          };
+          setConversations([initialMessage]);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     initConversations();
-    return () => clearTimeout(timeoutId);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   const sendMessage = async (message) => {

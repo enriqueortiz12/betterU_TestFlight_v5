@@ -64,7 +64,8 @@ export default {
     extra: {
       eas: {
         projectId: "66752963-da67-4c91-a146-db94dab08773"
-      }
+      },
+      openaiApiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY
     },
     owner: "enrique_ortiz22",
     runtimeVersion: {

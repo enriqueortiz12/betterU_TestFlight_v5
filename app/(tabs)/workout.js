@@ -12,6 +12,7 @@ const WorkoutScreen = () => {
   const [workoutLogs, setWorkoutLogs] = useState([]);
   const [monthlyWorkouts, setMonthlyWorkouts] = useState(0);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [userWorkouts, setUserWorkouts] = useState([]);
 
   const fetchWorkoutLogs = async () => {
     try {
@@ -58,9 +59,26 @@ const WorkoutScreen = () => {
     }
   };
 
+  const fetchUserWorkouts = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('workouts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setUserWorkouts(data || []);
+    } catch (error) {
+      console.error('Error fetching user workouts:', error);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchWorkoutLogs();
+      fetchUserWorkouts();
     }, [])
   );
 
@@ -111,6 +129,37 @@ const WorkoutScreen = () => {
     </View>
   );
 
+  const handleDeleteWorkout = async (workoutId) => {
+    Alert.alert(
+      'Delete Workout',
+      'Are you sure you want to delete this workout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive', onPress: async () => {
+            try {
+              const { error } = await supabase.from('workouts').delete().eq('id', workoutId);
+              if (error) throw error;
+              setUserWorkouts(userWorkouts.filter(w => w.id !== workoutId));
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Failed to delete workout.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const startWorkout = (workout) => {
+    router.push({
+      pathname: '/active-workout',
+      params: {
+        custom: 'true',
+        workout: JSON.stringify(workout)
+      }
+    });
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
@@ -128,12 +177,59 @@ const WorkoutScreen = () => {
         </View>
       </View>
 
-      <TouchableOpacity 
-        style={styles.trainingPlansButton}
-        onPress={() => router.push('/training-plans')}
-      >
-        <Text style={styles.trainingPlansButtonText}>Training Plans</Text>
-      </TouchableOpacity>
+      {/* Create Workout and Training Plans buttons stacked under Workouts header */}
+      <View style={{marginHorizontal: 20, marginTop: 10, marginBottom: 0}}>
+        <TouchableOpacity 
+          style={styles.trainingPlansButton}
+          onPress={() => router.push('/create-workout')}
+        >
+          <Ionicons name="add-circle-outline" size={20} color="#00ffff" style={{marginRight: 6}} />
+          <Text style={styles.trainingPlansButtonText}>Create Workout</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.trainingPlansButton}
+          onPress={() => router.push('/training-plans')}
+        >
+          <Text style={styles.trainingPlansButtonText}>Training Plans</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* User's Custom Workouts */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Your Workouts</Text>
+        {userWorkouts.length === 0 ? (
+          <Text style={styles.emptyText}>No custom workouts yet.</Text>
+        ) : (
+          userWorkouts.map((workout) => (
+            <View key={workout.id} style={styles.workoutCard}>
+              <View style={styles.workoutHeader}>
+                <Text style={styles.workoutTitle}>{workout.name}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.repRangeText}>{workout.exercises.length} exercises</Text>
+                  <TouchableOpacity onPress={() => handleDeleteWorkout(workout.id)}>
+                    <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <Text style={styles.workoutDescription}>Custom workout</Text>
+              <View style={styles.exercises}>
+                <Text style={styles.exercisesTitle}>Exercises:</Text>
+                {workout.exercises.map((ex, idx) => (
+                  <Text key={idx} style={styles.exercisesList}>
+                    • {ex.name} ({ex.sets} x {ex.reps})
+                  </Text>
+                ))}
+              </View>
+              <TouchableOpacity 
+                style={styles.startButton}
+                onPress={() => startWorkout(workout)}
+              >
+                <Text style={styles.startButtonText}>Start Workout</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </View>
 
       {/* Workout Types */}
       <View style={styles.section}>
@@ -498,11 +594,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 12,
     borderRadius: 20,
-    marginHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 12,
     alignItems: 'center',
-    width: '90%',
-    alignSelf: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#00ffff',
   },
   trainingPlansButtonText: {
     color: '#00ffff',

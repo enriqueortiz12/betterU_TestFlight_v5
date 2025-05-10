@@ -1199,7 +1199,7 @@ const workoutData = {
           'Set bench to 30 degree angle',
           'Grip bar slightly wider than shoulders',
           'Lower bar to upper chest',
-          'Press with control'
+          'Press bar up to starting position'
         ],
         sets: [
           { weight: '', reps: '10-12', completed: false },
@@ -1518,11 +1518,11 @@ const workoutData = {
 
 const ActiveWorkoutScreen = () => {
   const router = useRouter();
-  const { type } = useLocalSearchParams();
+  const params = useLocalSearchParams();
   const { updateStats, stats, incrementStat } = useTracking();
   const [elapsedTime, setElapsedTime] = useState(0);
   const [calories, setCalories] = useState(0);
-  const [workout, setWorkout] = useState(workoutData[type] || workoutData['Full Body Workout']);
+  const [workout, setWorkout] = useState(null);
   const [showRestTimer, setShowRestTimer] = useState(false);
   const [restTime, setRestTime] = useState(90);
   const [currentRestTime, setCurrentRestTime] = useState(90);
@@ -1531,6 +1531,39 @@ const ActiveWorkoutScreen = () => {
   const [showFinishConfirmation, setShowFinishConfirmation] = useState(false);
   const [showHowToModal, setShowHowToModal] = useState(false);
   const [currentExercise, setCurrentExercise] = useState(null);
+
+  // Initialize workout state based on params
+  useEffect(() => {
+    if (params.custom === 'true' && params.workout) {
+      try {
+        const parsed = JSON.parse(params.workout);
+        setWorkout({
+          name: parsed.name,
+          exercises: parsed.exercises.map(ex => {
+            let found = null;
+            for (const workout of Object.values(workoutData)) {
+              found = workout.exercises.find(e => e.name === ex.name);
+              if (found) break;
+            }
+            return {
+              name: ex.name,
+              targetMuscles: ex.targetMuscles || found?.targetMuscles || '',
+              instructions: ex.instructions || found?.instructions || [],
+              sets: Array.from({ length: parseInt(ex.sets) || 3 }, () => ({
+                weight: '',
+                reps: ex.reps || found?.sets?.[0]?.reps || '8-12',
+                completed: false
+              })),
+            };
+          }),
+        });
+      } catch (e) {
+        setWorkout(workoutData['Full Body Workout']);
+      }
+    } else {
+      setWorkout(workoutData[params.type] || workoutData['Full Body Workout']);
+    }
+  }, [params.custom, params.workout, params.type]);
 
   // Load saved rest time
   useEffect(() => {
@@ -1749,6 +1782,15 @@ const ActiveWorkoutScreen = () => {
     setShowHowToModal(true);
   };
 
+  // Add loading state at the top of the component
+  if (!workout) {
+    return (
+      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000'}}>
+        <Text style={{color: '#00ffff', fontSize: 18}}>Loading workout...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -1758,7 +1800,7 @@ const ActiveWorkoutScreen = () => {
         >
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.title}>{workout.name}</Text>
+        <Text style={styles.title}>{workout?.name}</Text>
         <TouchableOpacity 
           style={styles.finishButton}
           onPress={handleFinish}
@@ -1779,7 +1821,7 @@ const ActiveWorkoutScreen = () => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {workout.exercises.map((exercise, exerciseIndex) => (
+        {workout?.exercises.map((exercise, exerciseIndex) => (
           <View key={exerciseIndex} style={styles.exerciseCard}>
             <View style={styles.exerciseHeader}>
               <View>
@@ -1789,7 +1831,7 @@ const ActiveWorkoutScreen = () => {
                   onPress={() => handleHowToPress(exercise)}
                 >
                   <Text style={styles.howToText}>How-To</Text>
-                  <Text style={styles.targetMuscles}>{exercise.targetMuscles}</Text>
+                  <Text style={styles.targetMuscles}>{exercise.targetMuscles || 'No target muscles info'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1960,12 +2002,15 @@ const ActiveWorkoutScreen = () => {
               <Text style={styles.targetMusclesText}>{currentExercise?.targetMuscles}</Text>
               
               <Text style={styles.instructionsTitle}>Instructions:</Text>
-              {currentExercise?.instructions.map((instruction, index) => (
-                <View key={index} style={styles.instructionStep}>
-                  <Text style={styles.stepNumber}>{index + 1}.</Text>
-                  <Text style={styles.instructionText}>{instruction}</Text>
-                </View>
-              ))}
+              {(currentExercise?.instructions && currentExercise.instructions.length > 0)
+                ? currentExercise.instructions.map((instruction, index) => (
+                    <View key={index} style={styles.instructionStep}>
+                      <Text style={styles.stepNumber}>{index + 1}.</Text>
+                      <Text style={styles.instructionText}>{instruction}</Text>
+                    </View>
+                  ))
+                : <Text style={styles.instructionText}>No instructions available.</Text>
+              }
             </View>
           </View>
         </View>

@@ -21,578 +21,572 @@ export const TrackingProvider = ({ children }) => {
   const [stats, setStats] = useState({
     workouts: 0,
     minutes: 0,
-    mentalSessions: 0,
-    prsThisMonth: 0
+    mental_sessions: 0,
+    prs_this_month: 0,
+    streak: 0,
+    today_workout_completed: false,
+    today_mental_completed: false
   });
 
-  // Load saved data on mount and check for midnight reset
+  // Load saved data on mount
   useEffect(() => {
-    const loadDataAndCheckReset = async () => {
+    const loadSavedData = async () => {
       try {
-        // Get the last reset date
-        const lastResetDate = await AsyncStorage.getItem('lastResetDate');
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+        // Load goals first
+        const savedCalorieGoal = await AsyncStorage.getItem('calorieGoal');
+        const savedWaterGoal = await AsyncStorage.getItem('waterGoal');
+        
+        if (savedCalorieGoal) {
+          setCalories(prev => ({ ...prev, goal: parseInt(savedCalorieGoal) }));
+        }
+        if (savedWaterGoal) {
+          setWater(prev => ({ ...prev, goal: parseFloat(savedWaterGoal) }));
+        }
 
-        // Load saved data
+        // Load other data
         const savedCalories = await AsyncStorage.getItem('calories');
         const savedWater = await AsyncStorage.getItem('water');
         const savedMood = await AsyncStorage.getItem('mood');
         const savedStats = await AsyncStorage.getItem('stats');
 
-        // Parse saved data
-        let parsedCalories = savedCalories ? JSON.parse(savedCalories) : calories;
-        let parsedWater = savedWater ? JSON.parse(savedWater) : water;
-
-        // Check if we need to reset daily values
-        if (lastResetDate !== today) {
-          console.log('Resetting daily values - New day detected');
-          
-          // Reset only consumed values
-          parsedCalories = { ...parsedCalories, consumed: 0 };
-          parsedWater = { ...parsedWater, consumed: 0 };
-          
-          // Save the new reset date
-          await AsyncStorage.setItem('lastResetDate', today);
-
-          // If user is logged in, update Supabase
-          if (user) {
-            const { error: calorieError } = await supabase
-              .from('calorie_tracking')
-              .upsert({
-                user_id: user.id,
-                date: today,
-                consumed: 0,
-                goal: parsedCalories.goal,
-                updated_at: new Date().toISOString()
-              }, {
-                onConflict: 'user_id,date',
-                ignoreDuplicates: false
-              });
-
-            if (calorieError) {
-              console.error('Error resetting calorie tracking:', calorieError);
-            }
-
-            const { error: waterError } = await supabase
-              .from('water_tracking')
-              .upsert({
-                user_id: user.id,
-                date: today,
-                consumed: 0,
-                goal: parsedWater.goal,
-                updated_at: new Date().toISOString()
-              }, {
-                onConflict: 'user_id,date',
-                ignoreDuplicates: false
-              });
-
-            if (waterError) {
-              console.error('Error resetting water tracking:', waterError);
-            }
-          }
+        if (savedCalories) {
+          const parsedCalories = JSON.parse(savedCalories);
+          setCalories(prev => ({ ...prev, consumed: parsedCalories.consumed }));
         }
-
-        // Set the states
-        setCalories(parsedCalories);
-        setWater(parsedWater);
+        if (savedWater) {
+          const parsedWater = JSON.parse(savedWater);
+          setWater(prev => ({ ...prev, consumed: parsedWater.consumed }));
+        }
         if (savedMood) setMood(savedMood);
         if (savedStats) setStats(JSON.parse(savedStats));
 
-      } catch (error) {
-        console.error('Error in loadDataAndCheckReset:', error);
-      }
-    };
-
-    loadDataAndCheckReset();
-
-    // Set up interval to check for midnight reset
-    const interval = setInterval(async () => {
-      const lastResetDate = await AsyncStorage.getItem('lastResetDate');
-      const today = new Date().toISOString().split('T')[0];
-
-      if (lastResetDate !== today) {
-        console.log('Midnight reset detected - Reloading data');
-        loadDataAndCheckReset();
-      }
-    }, 30000); // Check every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [user]);
-
-  // Save data whenever it changes
-  useEffect(() => {
-    const saveData = async () => {
-      try {
-        await AsyncStorage.setItem('calories', JSON.stringify(calories));
-        await AsyncStorage.setItem('water', JSON.stringify(water));
-        await AsyncStorage.setItem('mood', mood);
-        await AsyncStorage.setItem('stats', JSON.stringify(stats));
-
-        // If user is logged in, update Supabase
+        // Initialize or load user stats from Supabase
         if (user) {
-          await supabase
-            .from('calorie_tracking')
-            .insert({
-              user_id: user.id,
-              consumed: calories.consumed,
-              goal: calories.goal,
-              updated_at: new Date().toISOString()
-            });
+          const { data: statsData } = await supabase
+            .from('user_stats')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
 
-          await supabase
-            .from('water_tracking')
-            .insert({
+          if (statsData) {
+            setStats(prev => ({
+              ...prev,
+              ...statsData,
+              today_workout_completed: statsData.today_workout_completed || false,
+              today_mental_completed: statsData.today_mental_completed || false
+            }));
+          } else {
+            // Initialize stats with default values
+            const initialStats = {
               user_id: user.id,
-              consumed: water.consumed,
-              goal: water.goal,
+              workouts: 0,
+              minutes: 0,
+              mental_sessions: 0,
+              prs_this_month: 0,
+              streak: 0,
+              today_workout_completed: false,
+              today_mental_completed: false,
               updated_at: new Date().toISOString()
-            });
+            };
+
+            const { error } = await supabase
+              .from('user_stats')
+              .upsert([initialStats], {
+                onConflict: 'user_id',
+                ignoreDuplicates: false
+              });
+
+            if (error) {
+              console.error('Error initializing stats:', error);
+            } else {
+              setStats(prev => ({
+                ...prev,
+                ...initialStats
+              }));
+            }
+          }
         }
       } catch (error) {
-        console.error('Error saving tracking data:', error);
+        console.error('Error loading saved data:', error);
       }
     };
 
-    saveData();
-  }, [calories, water, mood, stats, user]);
-
-  // Load tracking data when user changes
-  useEffect(() => {
-    if (user) {
-      loadTrackingData();
-    } else {
-      // Reset all states when user logs out
-      resetStates();
-    }
+    loadSavedData();
   }, [user]);
 
-  const resetStates = () => {
-      setStats({
-        workouts: 0,
-        minutes: 0,
-        mentalSessions: 0,
-        prsThisMonth: 0
-      });
-      setCalories({
-        consumed: 0,
-        goal: 2000
-      });
-      setWater({
-        consumed: 0,
-        goal: 2.0
-      });
-      setMood('neutral');
-  };
+  // Check for midnight reset and streak update
+  useEffect(() => {
+    const checkMidnightReset = async () => {
+      try {
+        if (!user) return;
 
-  const loadTrackingData = async () => {
-    try {
-      if (!user) return;
+        const today = new Date().toISOString().split('T')[0];
 
-      const today = new Date().toISOString().split('T')[0];
+        // Fetch the last reset date from the database
+        const { data: statsData, error: statsError } = await supabase
+          .from('user_stats')
+          .select('last_reset_date, today_workout_completed, today_mental_completed')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .single();
 
-      // Load today's calorie tracking
-      const { data: calorieData, error: calorieError } = await supabase
-        .from('calorie_tracking')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .single();
+        if (statsError) {
+          console.error('Error fetching last_reset_date:', statsError);
+          return;
+        }
 
-      if (calorieError && calorieError.code !== 'PGRST116') {
-        console.error('Error loading calorie data:', calorieError);
-      } else if (!calorieData) {
-        // Create new tracking entry for today
-        const { data: newCalorieData } = await supabase
+        if (statsData && statsData.last_reset_date === today) {
+          // Already reset today, do nothing
+          return;
+        }
+
+        // Check if yesterday's activities were completed before resetting
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+        // If both activities were completed yesterday, maintain/increment streak
+        // If not, reset streak to 0
+        let newStreak = 0;
+        if (statsData && statsData.today_workout_completed && statsData.today_mental_completed) {
+          // Fetch current streak
+          const { data: streakData } = await supabase
+            .from('betteru_streaks')
+            .select('current_streak, longest_streak')
+            .eq('user_id', user.id)
+            .single();
+
+          if (streakData) {
+            newStreak = streakData.current_streak + 1;
+            // Update streak in Supabase
+            await supabase
+              .from('betteru_streaks')
+              .upsert({
+                user_id: user.id,
+                current_streak: newStreak,
+                longest_streak: Math.max(newStreak, streakData.longest_streak),
+                last_completed_date: yesterdayStr,
+                updated_at: new Date().toISOString()
+              });
+          }
+        } else {
+          // Reset streak if activities were not completed
+          await supabase
+            .from('betteru_streaks')
+            .upsert({
+              user_id: user.id,
+              current_streak: 0,
+              last_completed_date: null,
+              updated_at: new Date().toISOString()
+            });
+        }
+
+        // Reset completion flags and update last reset date
+        await supabase
+          .from('user_stats')
+          .update({
+            today_workout_completed: false,
+            today_mental_completed: false,
+            last_reset_date: today,
+            updated_at: new Date().toISOString(),
+            streak: newStreak
+          })
+          .eq('user_id', user.id);
+
+        // Fetch the latest stats and set local state
+        const { data: latestStats, error: fetchError } = await supabase
+          .from('user_stats')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!fetchError && latestStats) {
+          setStats({ ...latestStats });
+        }
+
+        // Reset calories and water as before
+        setCalories(prev => ({ ...prev, consumed: 0 }));
+        setWater(prev => ({ ...prev, consumed: 0 }));
+        await AsyncStorage.setItem('lastResetDate', today);
+        await AsyncStorage.removeItem('calories');
+        await AsyncStorage.removeItem('water');
+
+        // Update Supabase for calories and water
+        await supabase
           .from('calorie_tracking')
-          .insert({
+          .upsert({
             user_id: user.id,
             date: today,
             consumed: 0,
-            goal: calories.goal
-          })
-          .select()
-          .single();
-
-        if (newCalorieData) {
-          setCalories({
-            consumed: newCalorieData.consumed,
-            goal: newCalorieData.goal
+            goal: calories.goal,
+            updated_at: new Date().toISOString()
           });
-        }
-      } else {
-        setCalories({
-          consumed: calorieData.consumed,
-          goal: calorieData.goal
-        });
-      }
 
-      // Load today's water tracking
-      const { data: waterData, error: waterError } = await supabase
-        .from('water_tracking')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .single();
-
-      if (waterError && waterError.code !== 'PGRST116') {
-        console.error('Error loading water data:', waterError);
-      } else if (!waterData) {
-        // Create new tracking entry for today
-        const { data: newWaterData } = await supabase
+        await supabase
           .from('water_tracking')
-          .insert({
+          .upsert({
             user_id: user.id,
             date: today,
             consumed: 0,
-            goal: water.goal
-          })
-          .select()
-          .single();
-
-        if (newWaterData) {
-          setWater({
-            consumed: newWaterData.consumed,
-            goal: newWaterData.goal
+            goal: water.goal,
+            updated_at: new Date().toISOString()
           });
-        }
-      } else {
-        setWater({
-          consumed: waterData.consumed,
-          goal: waterData.goal
-        });
+
+      } catch (error) {
+        console.error('Error in midnight reset check:', error);
       }
+    };
 
-      // Get current month's stats
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
-
-      // Load workout logs for current month
-      const { data: workoutLogs, error: logsError } = await supabase
-        .from('workout_logs')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('date', startOfMonth)
-        .lte('date', endOfMonth);
-
-      if (logsError) {
-        console.error('Error loading workout logs:', logsError);
-        return;
-      }
-
-      // Load PRs for current month
-      const { data: prs, error: prsError } = await supabase
-        .from('personal_records')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('created_at', startOfMonth)
-        .lte('created_at', endOfMonth);
-
-      if (prsError) {
-        console.error('Error loading PRs:', prsError);
-        return;
-      }
-
-      // Get other stats from user_stats
-      const { data: statsData, error: statsError } = await supabase
-        .from('user_stats')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (statsError && statsError.code !== 'PGRST116') {
-        console.error('Error loading stats:', statsError);
-        return;
-      }
-
-      // Update stats with current month's workout count and PRs
-      const monthlyWorkouts = workoutLogs ? workoutLogs.length : 0;
-      const monthlyPRs = prs ? prs.length : 0;
-      const newStats = {
-        workouts: monthlyWorkouts,
-        minutes: statsData?.minutes || 0,
-        mentalSessions: statsData?.mental_sessions || 0,
-        prsThisMonth: monthlyPRs
-      };
-
-      // Update Supabase with new stats
-      const { error: updateError } = await supabase
-        .from('user_stats')
-        .upsert({
-          user_id: user.id,
-          workouts: newStats.workouts,
-          minutes: newStats.minutes,
-          mental_sessions: newStats.mentalSessions,
-          prs_this_month: newStats.prsThisMonth,
-          updated_at: new Date().toISOString()
-        });
-
-      if (updateError) {
-        console.error('Error updating stats:', updateError);
-        return;
-      }
-
-      setStats(newStats);
-
-    } catch (error) {
-      console.error('Error in loadTrackingData:', error);
-    }
-  };
+    // Check every 30 seconds, but will only reset ONCE per day
+    const interval = setInterval(checkMidnightReset, 30000);
+    checkMidnightReset(); // Also run on mount
+    return () => clearInterval(interval);
+  }, [user, calories.goal, water.goal]);
 
   const addCalories = async (amount) => {
     try {
-      const newConsumed = calories.consumed + amount;
-      setCalories(prev => ({ ...prev, consumed: newConsumed }));
+      const newCalories = { ...calories, consumed: calories.consumed + amount };
+      setCalories(newCalories);
+      await AsyncStorage.setItem('calories', JSON.stringify(newCalories));
 
       if (user) {
         const today = new Date().toISOString().split('T')[0];
-      const { error } = await supabase
-        .from('calorie_tracking')
-          .upsert({
-          user_id: user.id,
-            date: today,
-            consumed: newConsumed,
-            goal: calories.goal,
-          updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id,date',
-            ignoreDuplicates: false
-        });
+        
+        // First check if entry exists
+        const { data: existingEntry } = await supabase
+          .from('calorie_tracking')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('date', today)
+          .single();
 
-        if (error) throw error;
+        if (existingEntry) {
+          // Update existing entry
+          const { error } = await supabase
+            .from('calorie_tracking')
+            .update({
+              consumed: newCalories.consumed,
+              goal: newCalories.goal,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingEntry.id);
+
+          if (error) {
+            console.error('Error updating calorie tracking:', error);
+          }
+        } else {
+          // Insert new entry
+          const { error } = await supabase
+            .from('calorie_tracking')
+            .insert({
+              user_id: user.id,
+              date: today,
+              consumed: newCalories.consumed,
+              goal: newCalories.goal,
+              updated_at: new Date().toISOString()
+            });
+
+          if (error) {
+            console.error('Error inserting calorie tracking:', error);
+          }
+        }
       }
-
-      await AsyncStorage.setItem('calories', JSON.stringify({ ...calories, consumed: newConsumed }));
-      return true;
     } catch (error) {
       console.error('Error adding calories:', error);
-      return false;
     }
   };
 
   const addWater = async (amount) => {
     try {
-      const newConsumed = water.consumed + amount;
-      setWater(prev => ({ ...prev, consumed: newConsumed }));
+      const newWater = { ...water, consumed: water.consumed + amount };
+      setWater(newWater);
+      await AsyncStorage.setItem('water', JSON.stringify(newWater));
 
       if (user) {
         const today = new Date().toISOString().split('T')[0];
-      const { error } = await supabase
-        .from('water_tracking')
-          .upsert({
-          user_id: user.id,
-            date: today,
-            consumed: newConsumed,
-            goal: water.goal,
-          updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id,date',
-            ignoreDuplicates: false
-        });
+        
+        // First check if entry exists
+        const { data: existingEntry } = await supabase
+          .from('water_tracking')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('date', today)
+          .single();
 
-        if (error) throw error;
+        if (existingEntry) {
+          // Update existing entry
+          const { error } = await supabase
+            .from('water_tracking')
+            .update({
+              consumed: newWater.consumed,
+              goal: newWater.goal,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingEntry.id);
+
+          if (error) {
+            console.error('Error updating water tracking:', error);
+          }
+        } else {
+          // Insert new entry
+          const { error } = await supabase
+            .from('water_tracking')
+            .insert({
+              user_id: user.id,
+              date: today,
+              consumed: newWater.consumed,
+              goal: newWater.goal,
+              updated_at: new Date().toISOString()
+            });
+
+          if (error) {
+            console.error('Error inserting water tracking:', error);
+          }
+        }
       }
-
-      await AsyncStorage.setItem('water', JSON.stringify({ ...water, consumed: newConsumed }));
-      return true;
     } catch (error) {
       console.error('Error adding water:', error);
-      return false;
     }
   };
 
-  const updateGoal = async (type, newGoal) => {
+  const updateGoal = async (type, amount) => {
     try {
       if (type === 'calories') {
-        setCalories(prev => ({ ...prev, goal: newGoal }));
-        if (user) {
-          const today = new Date().toISOString().split('T')[0];
-          await supabase
-          .from('calorie_tracking')
-            .upsert({
-            user_id: user.id,
-              date: today,
-            consumed: calories.consumed,
-            goal: newGoal,
-            updated_at: new Date().toISOString()
-          });
-        }
-        await AsyncStorage.setItem('calories', JSON.stringify({ ...calories, goal: newGoal }));
+        const newCalories = { ...calories, goal: amount };
+        setCalories(newCalories);
+        await AsyncStorage.setItem('calories', JSON.stringify(newCalories));
+        await AsyncStorage.setItem('calorieGoal', amount.toString());
       } else if (type === 'water') {
-        setWater(prev => ({ ...prev, goal: newGoal }));
-        if (user) {
-          const today = new Date().toISOString().split('T')[0];
-          await supabase
-          .from('water_tracking')
-            .upsert({
-            user_id: user.id,
-              date: today,
-            consumed: water.consumed,
-            goal: newGoal,
-            updated_at: new Date().toISOString()
-          });
-        }
-        await AsyncStorage.setItem('water', JSON.stringify({ ...water, goal: newGoal }));
+        const newWater = { ...water, goal: amount };
+        setWater(newWater);
+        await AsyncStorage.setItem('water', JSON.stringify(newWater));
+        await AsyncStorage.setItem('waterGoal', amount.toString());
       }
-      return true;
+
+      if (user) {
+        const today = new Date().toISOString().split('T')[0];
+        
+        // First check if entry exists
+        const { data: existingEntry } = await supabase
+          .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('date', today)
+          .single();
+
+        if (existingEntry) {
+          // Update existing entry
+          const { error } = await supabase
+            .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
+            .update({
+              goal: amount,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingEntry.id);
+
+          if (error) {
+            console.error('Error updating goal:', error);
+          }
+        } else {
+          // Insert new entry
+          const { error } = await supabase
+            .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
+            .insert({
+              user_id: user.id,
+              date: today,
+              goal: amount,
+              consumed: type === 'calories' ? calories.consumed : water.consumed,
+              updated_at: new Date().toISOString()
+            });
+
+          if (error) {
+            console.error('Error inserting goal:', error);
+          }
+        }
+      }
     } catch (error) {
       console.error('Error updating goal:', error);
-      return false;
     }
   };
 
   const updateMood = async (newMood) => {
     try {
-      await AsyncStorage.setItem('mood', newMood);
       setMood(newMood);
+      await AsyncStorage.setItem('mood', newMood);
+
+      if (user) {
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Always create a new entry for today's mood
+        const { error } = await supabase
+          .from('mood_tracking')
+          .insert({
+            user_id: user.id,
+            date: today,
+            mood: newMood,
+            created_at: new Date().toISOString()
+          });
+
+        if (error) {
+          console.error('Error inserting mood:', error);
+        }
+      }
     } catch (error) {
       console.error('Error updating mood:', error);
     }
   };
 
-  // Update stats functions
-  const updateStats = async (type, value) => {
+  const updateStats = async (newStats) => {
     try {
-      if (!user) return;
-
-      let newStats = { ...stats };
-
-      switch (type) {
-        case 'workouts':
-          newStats.workouts = value;
-          break;
-        case 'minutes':
-          newStats.minutes = value;
-          break;
-        case 'mentalSessions':
-          newStats.mentalSessions = value;
-          break;
-        case 'prsThisMonth':
-          newStats.prsThisMonth = value;
-          break;
-        default:
-          return;
-      }
-
-      // Update Supabase
-      const { error } = await supabase
-        .from('user_stats')
-        .upsert({
-          user_id: user.id,
-          workouts: newStats.workouts,
-          minutes: newStats.minutes,
-          mental_sessions: newStats.mentalSessions,
-          prs_this_month: newStats.prsThisMonth,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error('Error updating stats:', error);
-        return;
-      }
-
       setStats(newStats);
+      await AsyncStorage.setItem('stats', JSON.stringify(newStats));
+
+      if (user) {
+        const { error } = await supabase
+          .from('user_stats')
+          .upsert({
+            user_id: user.id,
+            ...newStats,
+            updated_at: new Date().toISOString()
+          });
+
+        if (error) {
+          console.error('Error updating stats:', error);
+        }
+      }
     } catch (error) {
-      console.error('Error in updateStats:', error);
+      console.error('Error updating stats:', error);
     }
   };
 
-  // Increment stats functions
-  const incrementStat = async (type) => {
+  const incrementStat = async (statName, amount = 1) => {
     try {
       if (!user) return;
 
-      // First check if record exists
-      const { data: existingStats, error: fetchError } = await supabase
+      // Get current stats
+      const { data: currentStats } = await supabase
         .from('user_stats')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error fetching stats:', fetchError);
+      if (!currentStats) {
+        // Initialize stats if they don't exist
+        const initialStats = {
+          user_id: user.id,
+          workouts: statName === 'workouts' ? amount : 0,
+          minutes: statName === 'minutes' ? amount : 0,
+          mental_sessions: statName === 'mental_sessions' ? amount : 0,
+          prs_this_month: statName === 'prs_this_month' ? amount : 0,
+          streak: 0,
+          today_workout_completed: statName === 'workouts',
+          today_mental_completed: statName === 'mental_sessions',
+          updated_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase
+          .from('user_stats')
+          .insert([initialStats]);
+
+        if (error) throw error;
+        setStats(initialStats);
         return;
       }
 
-      let newStats = { ...stats };
+      // Update the specific stat
+      const newValue = (currentStats[statName] || 0) + amount;
 
-      switch (type) {
-        case 'workouts':
-          newStats.workouts += 1;
-          break;
-        case 'minutes':
-          newStats.minutes += 1;
-          break;
-        case 'mentalSessions':
-          newStats.mentalSessions += 1;
-          break;
-        case 'prsThisMonth':
-          // Get current month's start and end dates
-          const now = new Date();
-          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-          const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
+      // Always preserve the current value of the flags unless setting to true
+      const updateData = {
+        [statName]: newValue,
+        today_workout_completed: statName === 'workouts' ? true : currentStats.today_workout_completed,
+        today_mental_completed: statName === 'mental_sessions' ? true : currentStats.today_mental_completed,
+        updated_at: new Date().toISOString()
+      };
 
-          // Count PRs for current month
-          const { data: prs, error: prsError } = await supabase
-            .from('personal_records')
+      // Only check streak if we haven't updated it today
+      if ((statName === 'workouts' || statName === 'mental_sessions')) {
+        const today = new Date().toISOString().split('T')[0];
+        const lastStreakUpdate = await AsyncStorage.getItem('lastStreakUpdate');
+        if (lastStreakUpdate !== today) {
+          // Check if both activities are completed today
+          const { data: workoutData } = await supabase
+            .from('workout_logs')
             .select('*')
             .eq('user_id', user.id)
-            .gte('created_at', startOfMonth)
-            .lte('created_at', endOfMonth);
+            .eq('date', today)
+            .single();
 
-          if (prsError) {
-            console.error('Error counting PRs:', prsError);
-            return;
+          const { data: mentalData } = await supabase
+            .from('mental_session_logs')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('completed_at', today)
+            .single();
+
+          // If both activities are completed, increment streak
+          if (workoutData && mentalData) {
+            const { data: streakData } = await supabase
+              .from('betteru_streaks')
+              .select('*')
+              .eq('user_id', user.id)
+              .single();
+
+            let currentStreak = streakData?.current_streak || 0;
+            let longestStreak = streakData?.longest_streak || 0;
+
+            currentStreak += 1;
+            if (currentStreak > longestStreak) {
+              longestStreak = currentStreak;
+            }
+
+            // Update streak in Supabase
+            await supabase
+              .from('betteru_streaks')
+              .upsert({
+                user_id: user.id,
+                current_streak: currentStreak,
+                longest_streak: longestStreak,
+                last_completed_date: today,
+                updated_at: new Date().toISOString()
+              });
+
+            // Update local state with new streak
+            setStats(prev => ({ ...prev, streak: currentStreak }));
+            
+            // Mark streak as updated for today
+            await AsyncStorage.setItem('lastStreakUpdate', today);
           }
-
-          newStats.prsThisMonth = prs ? prs.length : 0;
-          break;
-        default:
-          return;
-      }
-
-      // Update Supabase
-      if (existingStats) {
-        const { error } = await supabase
-          .from('user_stats')
-          .update({
-            workouts: newStats.workouts,
-            minutes: newStats.minutes,
-            mental_sessions: newStats.mentalSessions,
-            prs_this_month: newStats.prsThisMonth,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id);
-
-        if (error) {
-          console.error('Error updating stats:', error);
-          return;
-        }
-      } else {
-        const { error } = await supabase
-          .from('user_stats')
-          .insert({
-            user_id: user.id,
-            workouts: newStats.workouts,
-            minutes: newStats.minutes,
-            mental_sessions: newStats.mentalSessions,
-            prs_this_month: newStats.prsThisMonth,
-            updated_at: new Date().toISOString()
-          });
-
-        if (error) {
-          console.error('Error creating stats:', error);
-          return;
         }
       }
 
-      setStats(newStats);
+      // Update the stats in Supabase with completion flags
+      const { error } = await supabase
+        .from('user_stats')
+        .update(updateData)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Only fetch and set latest stats from Supabase
+      const { data: latestStats, error: fetchError } = await supabase
+        .from('user_stats')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!fetchError && latestStats) {
+        setStats({ ...latestStats });
+      }
+
     } catch (error) {
-      console.error('Error in incrementStat:', error);
+      console.error('Error incrementing stat:', error);
     }
   };
+
+  // The resetCompletionFlags function is now a no-op
+  const resetCompletionFlags = async () => {};
 
   return (
     <TrackingContext.Provider value={{

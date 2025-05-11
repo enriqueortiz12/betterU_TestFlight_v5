@@ -41,7 +41,7 @@ export const TrainerProvider = ({ children }) => {
     let isMounted = true;
     const timeoutId = setTimeout(() => {
       if (isMounted) {
-        setIsLoading(false);
+      setIsLoading(false);
       }
     }, 5000); // 5 second timeout
 
@@ -66,17 +66,17 @@ export const TrainerProvider = ({ children }) => {
       } catch (error) {
         console.error("Error loading conversations:", error);
         if (isMounted) {
-          const initialMessage = {
-            id: Date.now().toString(),
-            sender: "trainer",
-            message: "Hello! I'm your AI trainer. How can I help you today?",
-            timestamp: new Date().toISOString(),
-          };
-          setConversations([initialMessage]);
+        const initialMessage = {
+          id: Date.now().toString(),
+          sender: "trainer",
+          message: "Hello! I'm your AI trainer. How can I help you today?",
+          timestamp: new Date().toISOString(),
+        };
+        setConversations([initialMessage]);
         }
       } finally {
         if (isMounted) {
-          setIsLoading(false);
+        setIsLoading(false);
         }
       }
     };

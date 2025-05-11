@@ -125,29 +125,64 @@ const HomeScreen = () => {
         <Text style={styles.quoteAuthor}>- {currentQuote.author}</Text>
       </Animated.View>
 
+      <View style={styles.streakContainer}>
+        <View style={styles.streakContent}>
+          <Ionicons name="flame" size={24} color="#ff6b6b" />
+          <View style={styles.streakInfo}>
+            <Text style={styles.streakLabel}>BetterU Streak</Text>
+            <Text style={styles.streakValue}>{stats.streak || 0} days</Text>
+          </View>
+        </View>
+        <View style={styles.activityStatus}>
+          <View style={styles.activityItem}>
+            <Ionicons 
+              name={stats.today_workout_completed ? "checkmark-circle" : "ellipse-outline"} 
+              size={24} 
+              color={stats.today_workout_completed ? "#00ffff" : "#666"} 
+            />
+            <Text style={[styles.activityText, stats.today_workout_completed && styles.activityCompleted]}>
+              Workout
+            </Text>
+          </View>
+          <View style={styles.activityItem}>
+            <Ionicons 
+              name={stats.today_mental_completed ? "checkmark-circle" : "ellipse-outline"} 
+              size={24} 
+              color={stats.today_mental_completed ? "#00ffff" : "#666"} 
+            />
+            <Text style={[styles.activityText, stats.today_mental_completed && styles.activityCompleted]}>
+              Mental Session
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.streakDescription}>
+          Complete both a workout and mental session daily to maintain your streak!
+        </Text>
+      </View>
+
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
         <View style={styles.statsRow}>
           <View style={[styles.statsCard, { width: '48%' }]}>
             <Ionicons name="flame" size={24} color="#ff4444" />
-            <Text style={styles.statValue}>{stats.workouts}</Text>
+            <Text style={styles.statValue}>{stats.workouts || 0}</Text>
             <Text style={styles.statLabel}>Workouts</Text>
           </View>
           <View style={[styles.statsCard, { width: '48%' }]}>
             <Ionicons name="time" size={24} color="#4444ff" />
-            <Text style={styles.statValue}>{stats.minutes}</Text>
+            <Text style={styles.statValue}>{stats.minutes || 0}</Text>
             <Text style={styles.statLabel}>Minutes</Text>
           </View>
         </View>
         <View style={styles.statsRow}>
           <View style={[styles.statsCard, { width: '48%' }]}>
             <Ionicons name="leaf" size={24} color="#44ff44" />
-            <Text style={styles.statValue}>{stats.mentalSessions}</Text>
+            <Text style={styles.statValue}>{stats.mental_sessions || 0}</Text>
             <Text style={styles.statLabel}>Mental Sessions</Text>
           </View>
           <View style={[styles.statsCard, { width: '48%' }]}>
             <Ionicons name="trophy" size={24} color="#ffff44" />
-            <Text style={styles.statValue}>{stats.prsThisMonth}</Text>
+            <Text style={styles.statValue}>{stats.prs_this_month || 0}</Text>
             <Text style={styles.statLabel}>PRs This Month</Text>
           </View>
         </View>
@@ -677,6 +712,55 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 20,
+  },
+  streakContainer: {
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderRadius: 15,
+    padding: 20,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 107, 0.2)',
+  },
+  streakContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  streakInfo: {
+    marginLeft: 15,
+  },
+  streakLabel: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  streakValue: {
+    fontSize: 24,
+    color: '#ff6b6b',
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  streakDescription: {
+    fontSize: 14,
+    color: '#888',
+    marginTop: 8,
+  },
+  activityStatus: {
+    marginTop: 15,
+    gap: 10,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  activityText: {
+    color: '#666',
+    fontSize: 16,
+  },
+  activityCompleted: {
+    color: '#00ffff',
   },
 });
 

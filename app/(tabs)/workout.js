@@ -186,12 +186,12 @@ const WorkoutScreen = () => {
           <Ionicons name="add-circle-outline" size={20} color="#00ffff" style={{marginRight: 6}} />
           <Text style={styles.trainingPlansButtonText}>Create Workout</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.trainingPlansButton}
-          onPress={() => router.push('/training-plans')}
-        >
-          <Text style={styles.trainingPlansButtonText}>Training Plans</Text>
-        </TouchableOpacity>
+      <TouchableOpacity 
+        style={styles.trainingPlansButton}
+        onPress={() => router.push('/training-plans')}
+      >
+        <Text style={styles.trainingPlansButtonText}>Training Plans</Text>
+      </TouchableOpacity>
       </View>
 
       {/* User's Custom Workouts */}

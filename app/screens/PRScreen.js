@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { withSpring, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { formatNumber, formatWeight, formatPercentage } from '../../utils/formatUtils';
 
 const { width } = Dimensions.get('window');
 const chartWidth = width * 0.8;
@@ -38,11 +39,6 @@ const PRScreen = () => {
   // Conversion functions
   const kgToLbs = (kg) => kg * 2.20462;
   const lbsToKg = (lbs) => lbs / 2.20462;
-
-  const formatWeight = (value, unit) => {
-    if (!value) return '';
-    return `${Math.round(value * 100) / 100} ${unit}`;
-  };
 
   useEffect(() => {
     // Get the authenticated user's ID
@@ -79,8 +75,8 @@ const PRScreen = () => {
       const convertedData = data?.map(pr => ({
         id: pr.id,
         exercise: pr.exercise_name,
-        current_value: convertWeight(pr.weight_current, 'kg', getWeightUnit()),
-        target_value: convertWeight(pr.weight_target, 'kg', getWeightUnit()),
+        current_value: parseFloat(pr.weight_current),
+        target_value: parseFloat(pr.weight_target),
         unit: getWeightUnit(),
         created_at: pr.created_at
       })) || [];
@@ -342,7 +338,10 @@ const PRScreen = () => {
   const renderProgressModal = () => {
     if (!selectedPR) return null;
 
-    const progress = calculateProgress(selectedPR.current_value, selectedPR.target_value);
+    // Convert weights to the current unit
+    const currentValue = getWeightUnit() === 'lbs' ? kgToLbs(selectedPR.current_value) : selectedPR.current_value;
+    const targetValue = getWeightUnit() === 'lbs' ? kgToLbs(selectedPR.target_value) : selectedPR.target_value;
+    const progress = calculateProgress(currentValue, targetValue);
 
     return (
       <Modal
@@ -378,11 +377,11 @@ const PRScreen = () => {
                 <View style={styles.progressStats}>
                   <View style={styles.statItem}>
                     <Text style={styles.statLabel}>Current</Text>
-                    <Text style={styles.statValue}>{selectedPR.current_value} {selectedPR.unit}</Text>
+                    <Text style={styles.statValue}>{formatWeight(currentValue, getWeightUnit())}</Text>
                   </View>
                   <View style={styles.statItem}>
                     <Text style={styles.statLabel}>Target</Text>
-                    <Text style={styles.statValue}>{selectedPR.target_value} {selectedPR.unit}</Text>
+                    <Text style={styles.statValue}>{formatWeight(targetValue, getWeightUnit())}</Text>
                   </View>
                 </View>
 
@@ -411,80 +410,90 @@ const PRScreen = () => {
     );
   };
 
-  const renderPRCard = (pr) => (
-    <View key={pr.id} style={styles.prCard}>
-      <LinearGradient
-        colors={['#111', '#000']}
-        style={styles.prCardGradient}
-      >
-        <View style={styles.prContent}>
-          <View style={styles.prHeader}>
-            <Text style={styles.prExercise}>{pr.exercise}</Text>
-            <View style={styles.prActions}>
+  const renderPRCard = (pr) => {
+    // Convert weights to the current unit
+    const currentValue = getWeightUnit() === 'lbs' ? kgToLbs(pr.current_value) : pr.current_value;
+    const targetValue = getWeightUnit() === 'lbs' ? kgToLbs(pr.target_value) : pr.target_value;
+
+    return (
+      <View key={pr.id} style={styles.prCard}>
+        <LinearGradient
+          colors={['#111', '#000']}
+          style={styles.prCardGradient}
+        >
+          <View style={styles.prContent}>
+            <View style={styles.prHeader}>
+              <Text style={styles.prExercise}>{pr.exercise}</Text>
+              <View style={styles.prActions}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => startEditing(pr)}
+                >
+                  <Ionicons name="pencil" size={20} color="#00ffff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleDeletePress(pr)}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.prStats}>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Current</Text>
+                <Text style={styles.statValue}>
+                  {formatWeight(currentValue, getWeightUnit())}
+                </Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Target</Text>
+                <Text style={styles.statValue}>
+                  {formatWeight(targetValue, getWeightUnit())}
+                </Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Progress</Text>
+                <Text style={styles.statValue}>
+                  {formatPercentage(calculateProgress(currentValue, targetValue))}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.progressBarContainer}>
+              <LinearGradient
+                colors={['#00ffff', '#0088ff']}
+                style={[
+                  styles.progressFill,
+                  { 
+                    width: `${calculateProgress(currentValue, targetValue)}%`
+                  }
+                ]}
+              />
+            </View>
+
+            <View style={styles.cardFooter}>
+              <Text style={styles.estimatedTime}>
+                Est. completion: {calculateETA(currentValue, targetValue)}
+              </Text>
               <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => startEditing(pr)}
+                style={styles.detailsButton}
+                onPress={() => handleViewProgress({
+                  ...pr,
+                  current_value: currentValue,
+                  target_value: targetValue
+                })}
               >
-                <Ionicons name="pencil" size={20} color="#00ffff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => handleDeletePress(pr)}
-              >
-                <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                <Text style={styles.detailsButtonText}>Details</Text>
+                <Ionicons name="chevron-forward" size={16} color="#00ffff" />
               </TouchableOpacity>
             </View>
           </View>
-
-          <View style={styles.prStats}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Current</Text>
-              <Text style={styles.statValue}>
-                {formatWeight(pr.current_value, pr.unit)}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Target</Text>
-              <Text style={styles.statValue}>
-                {formatWeight(pr.target_value, pr.unit)}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Progress</Text>
-              <Text style={styles.statValue}>
-                {calculateProgress(pr.current_value, pr.target_value)}%
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.progressBarContainer}>
-            <LinearGradient
-              colors={['#00ffff', '#0088ff']}
-              style={[
-                styles.progressFill,
-                { 
-                  width: `${calculateProgress(pr.current_value, pr.target_value)}%`
-                }
-              ]}
-            />
-          </View>
-
-          <View style={styles.cardFooter}>
-            <Text style={styles.estimatedTime}>
-              Est. completion: {calculateETA(pr.current_value, pr.target_value)}
-            </Text>
-            <TouchableOpacity
-              style={styles.detailsButton}
-              onPress={() => handleViewProgress(pr)}
-            >
-              <Text style={styles.detailsButtonText}>Details</Text>
-              <Ionicons name="chevron-forward" size={16} color="#00ffff" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </LinearGradient>
-    </View>
-  );
+        </LinearGradient>
+      </View>
+    );
+  };
 
   return (
     <KeyboardAvoidingView 

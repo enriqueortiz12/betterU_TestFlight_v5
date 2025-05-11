@@ -1720,16 +1720,10 @@ const ActiveWorkoutScreen = () => {
         return;
       }
 
-      try {
-        // Update tracking stats
-        const minutesWorked = Math.floor(elapsedTime / 60);
-        await incrementStat('workouts');
-        await updateStats('minutes', stats.minutes + minutesWorked);
-      } catch (statsError) {
-        console.error('Error updating stats:', statsError);
-        Alert.alert('Error', 'Failed to update workout stats');
-        return;
-      }
+      // Update tracking stats
+      const minutesWorked = Math.floor(elapsedTime / 60);
+      await incrementStat('workouts', 1);
+      await incrementStat('minutes', minutesWorked);
 
       // Reset workout and hide confirmation
       resetWorkout();
@@ -2004,10 +1998,10 @@ const ActiveWorkoutScreen = () => {
               <Text style={styles.instructionsTitle}>Instructions:</Text>
               {(currentExercise?.instructions && currentExercise.instructions.length > 0)
                 ? currentExercise.instructions.map((instruction, index) => (
-                    <View key={index} style={styles.instructionStep}>
-                      <Text style={styles.stepNumber}>{index + 1}.</Text>
-                      <Text style={styles.instructionText}>{instruction}</Text>
-                    </View>
+                <View key={index} style={styles.instructionStep}>
+                  <Text style={styles.stepNumber}>{index + 1}.</Text>
+                  <Text style={styles.instructionText}>{instruction}</Text>
+                </View>
                   ))
                 : <Text style={styles.instructionText}>No instructions available.</Text>
               }

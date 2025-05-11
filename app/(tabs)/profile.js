@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useUnits } from '../../context/UnitsContext';
+import { useTracking } from '../../context/TrackingContext';
+import { supabase } from '../../lib/supabase';
 
 const ProfileScreen = () => {
   const { profile, refetchProfile, updateProfile } = useAuth();
@@ -19,6 +21,7 @@ const ProfileScreen = () => {
     convertWeightBack,
     convertHeightBack 
   } = useUnits();
+  const { calories, water, updateGoal } = useTracking();
   const [isLoading, setIsLoading] = useState(true);
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -186,7 +189,96 @@ const ProfileScreen = () => {
     },
   ];
 
+  const handleGoalEdit = async (type, value) => {
+    try {
+      const numValue = parseFloat(value);
+      if (isNaN(numValue) || numValue <= 0) {
+        Alert.alert('Invalid Value', 'Please enter a valid number greater than 0');
+        return;
+      }
+
+      // First check if entry exists for today
+      const today = new Date().toISOString().split('T')[0];
+      const { data: existingEntry } = await supabase
+        .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
+        .select('*')
+        .eq('user_id', profile.user_id)
+        .eq('date', today)
+        .single();
+
+      if (existingEntry) {
+        // Update existing entry
+        const { error } = await supabase
+          .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
+          .update({
+            goal: numValue,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingEntry.id);
+
+        if (error) throw error;
+      } else {
+        // Insert new entry
+        const { error } = await supabase
+          .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
+          .insert({
+            user_id: profile.user_id,
+            date: today,
+            goal: numValue,
+            consumed: type === 'calories' ? calories.consumed : water.consumed,
+            updated_at: new Date().toISOString()
+          });
+
+        if (error) throw error;
+      }
+
+      await updateGoal(type, numValue);
+      setEditingField(null);
+      setEditValue('');
+    } catch (error) {
+      console.error('Error updating goal:', error);
+      Alert.alert('Error', 'Failed to update goal');
+    }
+  };
+
+  const renderGoalSettings = () => null;
+
   const renderEditContent = () => {
+    if (editingField === 'calorie_goal' || editingField === 'water_goal') {
+      return (
+        <View style={styles.editContainer}>
+          <TextInput
+            style={styles.input}
+            value={editValue}
+            onChangeText={setEditValue}
+            keyboardType="numeric"
+            placeholder={editingField === 'calorie_goal' ? 'Enter calorie goal' : 'Enter water goal'}
+            placeholderTextColor="#666"
+          />
+          <View style={styles.editButtons}>
+            <TouchableOpacity
+              style={[styles.editButton, styles.cancelButton]}
+              onPress={() => {
+                setEditingField(null);
+                setEditValue('');
+              }}
+            >
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.editButton, styles.saveButton]}
+              onPress={() => handleGoalEdit(
+                editingField === 'calorie_goal' ? 'calories' : 'water',
+                editValue
+              )}
+            >
+              <Text style={styles.buttonText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
     if (editingField === 'fitness_goal') {
       return (
         <View style={styles.optionsGrid}>
@@ -387,49 +479,42 @@ const ProfileScreen = () => {
         </TouchableOpacity>
       </ScrollView>
 
-      <Modal
-        visible={!!editingField}
-        transparent={true}
-        animationType="fade"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[
-            styles.modalContent,
-            (editingField === 'fitness_goal' || editingField === 'gender') && styles.modalContentWide
-          ]}>
-            <Text style={styles.modalTitle}>
-              {editingField === 'fitness_goal' ? 'Select your goal' : 
-               editingField === 'gender' ? 'Select your gender' :
-               `Edit ${editingField?.replace('_', ' ')}`}
-            </Text>
-            
-            {renderEditContent()}
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
-                onPress={() => {
-                  setEditingField(null);
-                  setEditValue('');
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[
-                  styles.modalButton, 
-                  styles.saveButton,
-                  !validateInput(editingField, editValue) && styles.disabledButton
-                ]} 
-                onPress={handleSave}
-                disabled={!validateInput(editingField, editValue)}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
+      {editingField && (
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setEditingField(null)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                {editingField === 'calorie_goal' ? 'Edit Calorie Goal' : 
+                 editingField === 'water_goal' ? 'Edit Water Goal' : 
+                 'Edit Profile'}
+              </Text>
+              {renderEditContent()}
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setEditingField(null);
+                    setEditValue('');
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton]}
+                  onPress={handleSave}
+                >
+                  <Text style={styles.saveButtonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -739,6 +824,67 @@ const styles = StyleSheet.create({
   bmiCategory: {
     color: '#fff',
     fontSize: 14,
+  },
+  settingItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  settingInfo: {
+    flex: 1,
+  },
+  settingLabel: {
+    fontSize: 16,
+    color: '#fff',
+    marginBottom: 4,
+  },
+  settingValue: {
+    fontSize: 14,
+    color: '#666',
+  },
+  editContainer: {
+    padding: 15,
+  },
+  input: {
+    backgroundColor: '#222',
+    borderRadius: 10,
+    padding: 15,
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 15,
+  },
+  editButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#111',
+    borderRadius: 20,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 20,
+    textAlign: 'center',
   },
 });
 

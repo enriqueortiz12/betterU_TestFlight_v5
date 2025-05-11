@@ -1,12 +1,14 @@
 "use client";
 
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTracking } from '../context/TrackingContext';
 import { supabase } from '../lib/supabase';
+import { Audio } from 'expo-av';
+import Slider from '@react-native-community/slider';
 
 const ActiveMentalSession = () => {
   const router = useRouter();
@@ -18,6 +20,11 @@ const ActiveMentalSession = () => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const fadeAnimation = useRef(new Animated.Value(1)).current;
+  const [sound, setSound] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState(1.0);
+  const [isMuted, setIsMuted] = useState(false);
+  const soundRef = useRef(null);
 
   const session = {
     id: params.id,
@@ -26,6 +33,122 @@ const ActiveMentalSession = () => {
     description: params.description,
     steps: JSON.parse(params.steps),
     type: params.type
+  };
+
+  // Map session.id to audio file
+  const getAudioFile = () => {
+    if (session.id === 'box-breathing') {
+      return require('../assets/audio/box_breathing.mp3');
+    } else if (session.id === '478-breathing') {
+      return require('../assets/audio/478_breathing.mp3');
+    } else if (session.id === 'body_scan' || session.id === 'body-scan') {
+      return require('../assets/audio/body_scan_meditation.mp3');
+    } else if (
+      session.id === 'mindful_awareness' ||
+      session.id === 'mindful-awareness' ||
+      session.id === 'mindful-meditation'
+    ) {
+      return require('../assets/audio/mindful_awareness_meditation.mp3');
+    } else if (
+      session.id === 'progressive_relaxation' ||
+      session.id === 'progressive-relaxation'
+    ) {
+      return require('../assets/audio/progressive_relaxation_meditation.mp3');
+    } else if (
+      session.id === 'visualization' ||
+      session.id === 'peaceful_place' ||
+      session.id === 'peaceful-place'
+    ) {
+      return require('../assets/audio/peaceful_place_meditation.mp3');
+    }
+    return null;
+  };
+
+  // Load audio when session starts or session.id changes
+  useEffect(() => {
+    let isMounted = true;
+    const loadAudio = async () => {
+      try {
+        // Unload any existing sound
+        if (soundRef.current) {
+          await soundRef.current.unloadAsync();
+        }
+        const audioFile = getAudioFile();
+        console.log('Audio file for session', session.id, audioFile ? 'FOUND' : 'NOT FOUND');
+        if (audioFile) {
+          await Audio.setAudioModeAsync({
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: true,
+            shouldDuckAndroid: true,
+          });
+          const { sound: audioSound } = await Audio.Sound.createAsync(
+            audioFile,
+            { shouldPlay: false, volume: volume }
+          );
+          await audioSound.setRateAsync(0.80, true);
+          soundRef.current = audioSound;
+          if (isMounted) {
+            setSound(audioSound);
+            setIsPlaying(false);
+          }
+        } else {
+          soundRef.current = null;
+          if (isMounted) {
+            setSound(null);
+            setIsPlaying(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading audio:', error);
+        Alert.alert('Error', 'Failed to load audio');
+      }
+    };
+    loadAudio();
+    return () => {
+      isMounted = false;
+      if (soundRef.current) {
+        soundRef.current.stopAsync();
+        soundRef.current.unloadAsync();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id]);
+
+  // Play audio when session is activated
+  useEffect(() => {
+    if (!sound) {
+      console.log('No sound loaded, skipping play/pause');
+      return;
+    }
+    if (isActive && !isPlaying) {
+      sound.playAsync();
+      sound.setRateAsync(0.80, true);
+      setIsPlaying(true);
+    } else if (!isActive && isPlaying) {
+      sound.pauseAsync();
+      setIsPlaying(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, sound]);
+
+  // Handle volume change
+  const handleVolumeChange = async (value) => {
+    setVolume(value);
+    if (sound) {
+      await sound.setVolumeAsync(value);
+    }
+  };
+
+  // Handle mute toggle
+  const toggleMute = async () => {
+    if (sound) {
+      if (isMuted) {
+        await sound.setVolumeAsync(volume);
+      } else {
+        await sound.setVolumeAsync(0);
+      }
+      setIsMuted(!isMuted);
+    }
   };
 
   useEffect(() => {
@@ -79,7 +202,7 @@ const ActiveMentalSession = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Save session to Supabase (new table)
+  // Save session to Supabase
   const handleSessionComplete = async () => {
     try {
       if (!user) return;
@@ -94,7 +217,7 @@ const ActiveMentalSession = () => {
           completed_at: new Date().toISOString(),
         });
       if (error) throw error;
-      await incrementStat('mentalSessions');
+      await incrementStat('mental_sessions');
       Alert.alert(
         'Session Complete',
         'Great job completing your mental wellness session!',
@@ -111,6 +234,8 @@ const ActiveMentalSession = () => {
     try {
       if (!user) return;
       setIsActive(false);
+
+      // Save session to Supabase
       const { error } = await supabase
         .from('mental_session_logs')
         .insert({
@@ -120,8 +245,13 @@ const ActiveMentalSession = () => {
           duration: session.duration,
           completed_at: new Date().toISOString(),
         });
+
       if (error) throw error;
-      await incrementStat('mentalSessions');
+
+      // Update stats
+      await incrementStat('mental_sessions');
+
+      // Navigate to summary
       router.push({
         pathname: '/mental-session-summary',
         params: {
@@ -132,6 +262,20 @@ const ActiveMentalSession = () => {
     } catch (error) {
       console.error('Error saving session:', error);
       Alert.alert('Error', 'Failed to save session');
+    }
+  };
+
+  // Replay audio from the beginning
+  const replayAudio = async () => {
+    if (sound) {
+      try {
+        await sound.setPositionAsync(0);
+        await sound.setRateAsync(0.80, true);
+        await sound.playAsync();
+        setIsPlaying(true);
+      } catch (error) {
+        console.error('Error replaying audio:', error);
+      }
     }
   };
 
@@ -161,69 +305,115 @@ const ActiveMentalSession = () => {
         <Text style={styles.title}>{session.title}</Text>
       </View>
 
-      {/* Timer Circle */}
-      <View style={styles.timerContainer}>
-        <View style={styles.timerCircle}>
-          <Animated.View 
-            style={[
-              styles.progressCircle,
-              {
-                transform: [{
-                  rotateZ: progressAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0deg', '360deg']
-                  })
-                }]
-              }
-            ]}
-          />
-          <View style={styles.timerContent}>
-            <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
-            <TouchableOpacity
-              style={[styles.timerButton, isActive && styles.timerButtonActive]}
-              onPress={() => setIsActive(!isActive)}
-            >
-              <Ionicons 
-                name={isActive ? "pause" : "play"} 
-                size={30} 
-                color={isActive ? "#000" : "#00ffff"} 
-              />
-            </TouchableOpacity>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Timer Circle */}
+        <View style={styles.timerContainer}>
+          <View style={styles.timerCircle}>
+            <Animated.View 
+              style={[
+                styles.progressCircle,
+                {
+                  transform: [{
+                    rotateZ: progressAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg']
+                    })
+                  }]
+                }
+              ]}
+            />
+            <View style={styles.timerContent}>
+              <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
+              <TouchableOpacity
+                style={[styles.timerButton, isActive && styles.timerButtonActive]}
+                onPress={() => {
+                  if (!sound) {
+                    console.log('Play pressed but sound is not loaded');
+                    return;
+                  }
+                  setIsActive(!isActive);
+                  if (!isActive) {
+                    sound && sound.playAsync();
+                  } else {
+                    sound && sound.pauseAsync();
+                  }
+                }}
+                disabled={!sound}
+              >
+                <Ionicons 
+                  name={isActive ? "pause" : "play"} 
+                  size={30} 
+                  color={isActive ? "#000" : "#00ffff"} 
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
+
+        {/* Audio Controls */}
+        {sound && (
+          <View style={styles.audioControls}>
+            <TouchableOpacity onPress={toggleMute} style={styles.muteButton}>
+              <Ionicons 
+                name={isMuted ? "volume-mute" : "volume-high"} 
+                size={24} 
+                color="#00ffff" 
+              />
+            </TouchableOpacity>
+            <Slider
+              style={styles.volumeSlider}
+              minimumValue={0}
+              maximumValue={1}
+              value={isMuted ? 0 : volume}
+              onValueChange={handleVolumeChange}
+              minimumTrackTintColor="#00ffff"
+              maximumTrackTintColor="rgba(0, 255, 255, 0.3)"
+              thumbTintColor="#00ffff"
+            />
+            <TouchableOpacity onPress={replayAudio} style={styles.muteButton}>
+              <Ionicons name="refresh" size={24} color="#00ffff" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Current Step */}
+        <Animated.View 
+          style={[
+            styles.stepContainer, 
+            { 
+              opacity: fadeAnimation,
+              transform: [{
+                translateY: fadeAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0]
+                })
+              }]
+            }
+          ]}
+        >
+          <Text style={styles.stepNumber}>Step {currentStepIndex + 1}/{session.steps.length}</Text>
+          <Text style={styles.stepText}>{session.steps[currentStepIndex]}</Text>
+        </Animated.View>
+
+        {/* Description */}
+        <View style={styles.descriptionContainer}>
+          <Text style={styles.descriptionText}>{session.description}</Text>
+        </View>
+      </ScrollView>
+
+      {/* Finish Button */}
+      <View style={styles.finishButtonContainer}>
+        <TouchableOpacity
+          style={styles.finishButton}
+          onPress={handleFinishSession}
+        >
+          <Text style={styles.finishButtonText}>Finish Session</Text>
+        </TouchableOpacity>
       </View>
-
-      {/* Current Step */}
-      <Animated.View 
-        style={[
-          styles.stepContainer, 
-          { 
-            opacity: fadeAnimation,
-            transform: [{
-              translateY: fadeAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [20, 0]
-              })
-            }]
-          }
-        ]}
-      >
-        <Text style={styles.stepNumber}>Step {currentStepIndex + 1}/{session.steps.length}</Text>
-        <Text style={styles.stepText}>{session.steps[currentStepIndex]}</Text>
-      </Animated.View>
-
-      {/* Description */}
-      <View style={styles.descriptionContainer}>
-        <Text style={styles.descriptionText}>{session.description}</Text>
-      </View>
-
-      {/* Finish Button (always visible) */}
-      <TouchableOpacity
-        style={[styles.finishButton, { marginTop: 30 }]}
-        onPress={handleFinishSession}
-      >
-        <Text style={styles.finishButtonText}>Finish Session</Text>
-      </TouchableOpacity>
     </View>
   );
 };
@@ -232,6 +422,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    paddingBottom: 20,
   },
   header: {
     flexDirection: 'row',
@@ -358,17 +554,37 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  finishButtonContainer: {
+    padding: 20,
+    paddingBottom: 40,
+    backgroundColor: '#000000',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
   finishButton: {
     backgroundColor: '#00ffff',
     padding: 20,
     borderRadius: 10,
     alignItems: 'center',
-    marginHorizontal: 20,
   },
   finishButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#000',
+  },
+  audioControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+  muteButton: {
+    padding: 10,
+    marginRight: 10,
+  },
+  volumeSlider: {
+    flex: 1,
+    height: 40,
   },
 });
 

@@ -12,11 +12,12 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useUnits } from '../../../context/UnitsContext';
 import { Ionicons } from '@expo/vector-icons';
+import { formatBMI } from '../../../utils/formatUtils';
 
 const calculateBMI = (weight, height) => {
   // Convert height from cm to m
   const heightInMeters = height / 100;
-  return (weight / (heightInMeters * heightInMeters)).toFixed(1);
+  return formatBMI(weight / (heightInMeters * heightInMeters));
 };
 
 const getBMICategory = (bmi) => {

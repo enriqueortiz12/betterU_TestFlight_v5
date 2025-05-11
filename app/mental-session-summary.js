@@ -3,12 +3,14 @@
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTracking } from '../context/TrackingContext';
 import { supabase } from '../lib/supabase';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 const MentalSessionSummary = () => {
   const { user } = useAuth();
+  const { incrementStat } = useTracking();
   const router = useRouter();
   const params = useLocalSearchParams();
   const sessionType = params.sessionType;
@@ -18,24 +20,35 @@ const MentalSessionSummary = () => {
 
   const handleSave = async () => {
     try {
-      const { error } = await supabase
+      // First save the session
+      const { data, error } = await supabase
         .from('mental_session_logs')
         .insert([
           {
             user_id: user.id,
+            session_type: sessionType,
             type: sessionType,
-            duration: duration,
+            duration: parseInt(duration),
             calmness_level: calmnessLevel,
             notes: notes,
             completed_at: new Date().toISOString(),
+            created_at: new Date().toISOString()
           },
         ]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error saving session:', error);
+        throw error;
+      }
+
+      // Then update stats
+      await incrementStat('mental_sessions');
+      
+      // Navigate to mental screen
       router.push('/mental');
     } catch (error) {
-      console.error('Error saving session:', error);
-      Alert.alert('Error', 'Failed to save session');
+      console.error('Error in handleSave:', error);
+      Alert.alert('Error', 'Failed to save session. Please try again.');
     }
   };
 

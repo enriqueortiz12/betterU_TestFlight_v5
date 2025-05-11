@@ -590,7 +590,7 @@ const MentalScreen = () => {
               <Text style={styles.modalCloseButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-        </View>
+    </View>
       </Modal>
     </ScrollView>
   );

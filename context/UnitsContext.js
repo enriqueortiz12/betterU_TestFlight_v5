@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { formatNumber } from '../utils/formatUtils';
 
 const UnitsContext = createContext();
 
@@ -34,22 +35,22 @@ export const UnitsProvider = ({ children }) => {
   // Conversion functions
   const convertWeight = (kg) => {
     if (!kg) return null;
-    return useImperial ? (kg * 2.20462).toFixed(1) : kg.toString();
+    return useImperial ? formatNumber(kg * 2.20462) : formatNumber(kg);
   };
 
   const convertHeight = (cm) => {
     if (!cm) return null;
-    return useImperial ? (cm / 2.54).toFixed(1) : cm.toString();
+    return useImperial ? formatNumber(cm / 2.54) : formatNumber(cm);
   };
 
   const convertWeightBack = (value) => {
     if (!value) return null;
-    return useImperial ? (parseFloat(value) / 2.20462).toFixed(1) : value;
+    return useImperial ? formatNumber(parseFloat(value) / 2.20462) : formatNumber(value);
   };
 
   const convertHeightBack = (value) => {
     if (!value) return null;
-    return useImperial ? (parseFloat(value) * 2.54).toFixed(1) : value;
+    return useImperial ? formatNumber(parseFloat(value) * 2.54) : formatNumber(value);
   };
 
   const getWeightUnit = () => useImperial ? 'lbs' : 'kg';

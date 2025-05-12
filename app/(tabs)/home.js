@@ -1,12 +1,13 @@
 "use client";
 
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Animated, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useTracking } from '../../context/TrackingContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';
 import PremiumFeature from '../components/PremiumFeature';
+import { supabase } from '../../lib/supabase';
 
 // Add more motivational quotes
 const motivationalQuotes = [
@@ -131,7 +132,7 @@ const motivationalQuotes = [
 const HomeScreen = () => {
   const router = useRouter();
   const { profile, isPremium } = useAuth();
-  const { calories, water, mood, stats, addCalories, addWater, updateGoal } = useTracking();
+  const { calories, water, mood, stats, addCalories, addWater, updateGoal, incrementStat } = useTracking();
   const [showCalorieModal, setShowCalorieModal] = useState(false);
   const [calorieInput, setCalorieInput] = useState('');
   const [showCustomWaterModal, setShowCustomWaterModal] = useState(false);
@@ -143,6 +144,9 @@ const HomeScreen = () => {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [showGoalModal, setShowGoalModal] = useState(null);
   const [goalInput, setGoalInput] = useState('');
+  const [streakUpdatedToday, setStreakUpdatedToday] = useState(false);
+  const [workoutCompleted, setWorkoutCompleted] = useState(stats.today_workout_completed);
+  const [mentalCompleted, setMentalCompleted] = useState(stats.today_mental_completed);
 
   // Update quote rotation with smooth transitions
   useEffect(() => {
@@ -174,6 +178,110 @@ const HomeScreen = () => {
 
     return () => clearInterval(intervalId);
   }, [currentQuote]);
+
+  useEffect(() => {
+    const checkMidnightReset = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      const timeUntilMidnight = midnight - now;
+
+      if (timeUntilMidnight <= 0) {
+        // Reset trackers at midnight
+        addCalories(-calories.consumed);
+        addWater(-water.consumed);
+        // Reset streak update flag
+        setStreakUpdatedToday(false);
+      }
+    };
+
+    const intervalId = setInterval(checkMidnightReset, 60000); // Check every minute
+    return () => clearInterval(intervalId);
+  }, [calories.consumed, water.consumed]);
+
+  useEffect(() => {
+    const checkStreakIncrement = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      const timeUntilMidnight = midnight - now;
+
+      if (timeUntilMidnight <= 0) {
+        // Increment streak at midnight if conditions are met
+        if (stats.workouts > 0 || stats.mental_sessions > 0) {
+          incrementStat('streak', 1);
+        }
+      }
+    };
+
+    const intervalId = setInterval(checkStreakIncrement, 60000); // Check every minute
+    return () => clearInterval(intervalId);
+  }, [stats.workouts, stats.mental_sessions]);
+
+  useEffect(() => {
+    setWorkoutCompleted(stats.today_workout_completed);
+    setMentalCompleted(stats.today_mental_completed);
+  }, [stats.today_workout_completed, stats.today_mental_completed]);
+
+  // Add a useEffect to fetch and sync state on login
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!profile?.id) {
+        console.log('Profile not loaded yet');
+        return;
+      }
+
+      console.log('Fetching stats for user:', profile.id);
+      // Get stats from profiles table
+      let { data, error } = await supabase
+        .from('profiles')
+        .select('today_workout_completed, today_mental_completed, last_streak_update')
+        .eq('id', profile.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching stats:', error);
+        return;
+      }
+
+      console.log('Fetched stats:', data);
+      setWorkoutCompleted(data.today_workout_completed);
+      setMentalCompleted(data.today_mental_completed);
+      const today = new Date().toISOString().split('T')[0];
+      setStreakUpdatedToday(data.last_streak_update === today);
+    };
+    fetchStats();
+  }, [profile]);
+
+  // Add a useEffect to check for daily reset
+  useEffect(() => {
+    const checkDailyReset = async () => {
+      if (!profile?.id) return;
+
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('last_streak_update')
+        .eq('id', profile.id)
+        .single();
+
+      if (error) {
+        console.error('Error checking daily reset:', error);
+        return;
+      }
+
+      // If last_streak_update is not today, reset the streak update flag
+      if (data.last_streak_update !== today) {
+        setStreakUpdatedToday(false);
+      }
+    };
+
+    // Check every minute
+    const interval = setInterval(checkDailyReset, 60000);
+    checkDailyReset(); // Initial check
+
+    return () => clearInterval(interval);
+  }, [profile]);
 
   const handleAddCalories = () => {
     const amount = parseInt(calorieInput);
@@ -210,6 +318,69 @@ const HomeScreen = () => {
     }
   };
 
+  // Update the updateStreak function to use profiles table
+  const updateStreak = async () => {
+    if (!profile?.id) {
+      Alert.alert('Error', 'Please wait for your profile to load');
+      return;
+    }
+
+    if (streakUpdatedToday) {
+      Alert.alert('Already Updated', 'You have already updated your streak today.');
+      return;
+    }
+    if (workoutCompleted && mentalCompleted) {
+      const today = new Date().toISOString().split('T')[0];
+      console.log('Updating streak for user:', profile.id);
+      
+      // Get current streak from profiles
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('streak, longest_streak')
+        .eq('id', profile.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        Alert.alert('Error', 'Failed to update streak. Please try again.');
+        return;
+      }
+
+      // Calculate new streak values
+      const currentStreak = (profileData?.streak || 0) + 1;
+      const longestStreak = Math.max(currentStreak, profileData?.longest_streak || 0);
+
+      // Update streak in profiles table
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          streak: currentStreak,
+          longest_streak: longestStreak,
+          last_streak_update: today
+        })
+        .eq('id', profile.id);
+
+      if (updateError) {
+        console.error('Error updating streak:', updateError);
+        Alert.alert('Error', 'Failed to update streak. Please try again.');
+        return;
+      }
+
+      // Update local state
+      incrementStat('streak', 1);
+      setStreakUpdatedToday(true);
+      setWorkoutCompleted(false);
+      setMentalCompleted(false);
+      Alert.alert('Success', 'Your streak has been updated!');
+    } else if (!workoutCompleted && !mentalCompleted) {
+      Alert.alert('Incomplete', 'You need both a workout and a mental session to update your streak.');
+    } else if (!workoutCompleted) {
+      Alert.alert('Incomplete', 'You need a workout to update your streak.');
+    } else if (!mentalCompleted) {
+      Alert.alert('Incomplete', 'You need a mental session to update your streak.');
+    }
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
@@ -233,33 +404,42 @@ const HomeScreen = () => {
             <Text style={styles.streakValue}>{stats.streak || 0} days</Text>
           </View>
         </View>
+        {!streakUpdatedToday && (
+          <TouchableOpacity 
+            style={styles.updateStreakButton}
+            onPress={updateStreak}
+          >
+            <Text style={styles.updateStreakButtonText}>
+              Update Streak
+            </Text>
+          </TouchableOpacity>
+        )}
         <View style={styles.activityStatus}>
           <View style={styles.activityItem}>
             <Ionicons 
-              name={stats.today_workout_completed ? "checkmark-circle" : "ellipse-outline"} 
+              name={workoutCompleted ? "checkmark-circle" : "ellipse-outline"} 
               size={24} 
-              color={stats.today_workout_completed ? "#00ffff" : "#666"} 
+              color={workoutCompleted ? "#ff0000" : "#666"} 
             />
-            <Text style={[styles.activityText, stats.today_workout_completed && styles.activityCompleted]}>
+            <Text style={[styles.activityText, workoutCompleted && styles.activityCompleted]}>
               Workout
             </Text>
           </View>
           <View style={styles.activityItem}>
             <Ionicons 
-              name={stats.today_mental_completed ? "checkmark-circle" : "ellipse-outline"} 
+              name={mentalCompleted ? "checkmark-circle" : "ellipse-outline"} 
               size={24} 
-              color={stats.today_mental_completed ? "#00ffff" : "#666"} 
+              color={mentalCompleted ? "#ff0000" : "#666"} 
             />
-            <Text style={[styles.activityText, stats.today_mental_completed && styles.activityCompleted]}>
+            <Text style={[styles.activityText, mentalCompleted && styles.activityCompleted]}>
               Mental Session
             </Text>
           </View>
         </View>
         <Text style={styles.streakDescription}>
-          Complete both a workout and mental session daily to maintain your streak!
-        </Text>
-        <Text style={{ color: '#00bfff', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
-          Streak updates at midnight
+          {streakUpdatedToday
+            ? 'Come back tomorrow to update your streak again!'
+            : 'Complete both a workout and mental session daily to maintain your streak!'}
         </Text>
       </View>
 
@@ -862,6 +1042,18 @@ const styles = StyleSheet.create({
   },
   activityCompleted: {
     color: '#00ffff',
+  },
+  updateStreakButton: {
+    backgroundColor: '#00ffff',
+    borderRadius: 8,
+    padding: 10,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  updateStreakButtonText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 

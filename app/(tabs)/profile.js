@@ -486,40 +486,40 @@ const ProfileScreen = () => {
       </ScrollView>
 
       {editingField && (
-        <Modal
+      <Modal
           visible={true}
-          transparent={true}
+        transparent={true}
           animationType="slide"
           onRequestClose={() => setEditingField(null)}
-        >
+      >
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>
+            <Text style={styles.modalTitle}>
                 {editingField === 'calorie_goal' ? 'Edit Calorie Goal' : 
                  editingField === 'water_goal' ? 'Edit Water Goal' : 
                  'Edit Profile'}
-              </Text>
-              {renderEditContent()}
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => {
-                    setEditingField(null);
-                    setEditValue('');
-                  }}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+            </Text>
+            {renderEditContent()}
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => {
+                  setEditingField(null);
+                  setEditValue('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
                   style={[styles.modalButton, styles.saveButton]}
-                  onPress={handleSave}
-                >
-                  <Text style={styles.saveButtonText}>Save</Text>
-                </TouchableOpacity>
-              </View>
+                onPress={handleSave}
+              >
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
       )}
     </View>
   );

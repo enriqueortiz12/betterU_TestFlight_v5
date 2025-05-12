@@ -175,7 +175,8 @@ const WorkoutScreen = () => {
         'Box Jumps',
         'Chin-Ups',
         "Farmer's Walk"
-      ]
+      ],
+      howTo: 'Focus on explosive movements and maintain proper form throughout the circuit.'
     },
     {
       name: 'Glute & Core Sculpt',
@@ -189,7 +190,8 @@ const WorkoutScreen = () => {
         'Plank Variations',
         'Bulgarian Split Squats',
         'Hanging Leg Raises'
-      ]
+      ],
+      howTo: 'Engage your core and glutes with each movement for maximum effectiveness.'
     },
     {
       name: 'Ultimate Conditioning',
@@ -203,7 +205,8 @@ const WorkoutScreen = () => {
         'Burpee Pull-Ups',
         'Rowing Sprints',
         'Medicine Ball Slams'
-      ]
+      ],
+      howTo: 'Push yourself to the limit with short, intense bursts of activity.'
     },
     {
       name: 'Push-Pull-Legs Pro',
@@ -217,7 +220,98 @@ const WorkoutScreen = () => {
         'Walking Lunges',
         'Arnold Press',
         'Nordic Hamstring Curls'
-      ]
+      ],
+      howTo: 'Focus on compound movements to maximize muscle engagement and growth.'
+    },
+    {
+      name: 'Elite Strength Builder',
+      description: 'Build raw strength with heavy compound lifts',
+      repRange: '5-8 reps',
+      duration: '70 min',
+      intensity: 'Elite',
+      exercises: [
+        'Deadlift',
+        'Squat',
+        'Bench Press',
+        'Overhead Press',
+        'Barbell Row'
+      ],
+      howTo: 'Use heavy weights and focus on form to build maximum strength.'
+    },
+    {
+      name: 'High-Intensity Interval Training',
+      description: 'Burn fat and improve cardiovascular health',
+      repRange: '20s work, 10s rest',
+      duration: '30 min',
+      intensity: 'High',
+      exercises: [
+        'Mountain Climbers',
+        'Jump Squats',
+        'High Knees',
+        'Burpees',
+        'Plank Jacks'
+      ],
+      howTo: 'Alternate between high-intensity exercises and short rest periods for maximum calorie burn.'
+    },
+    {
+      name: 'Flexibility and Mobility',
+      description: 'Improve flexibility and joint mobility',
+      repRange: '30-60s holds',
+      duration: '45 min',
+      intensity: 'Low',
+      exercises: [
+        'Dynamic Stretching',
+        'Foam Rolling',
+        'Yoga Poses',
+        'Joint Mobility',
+        'Static Stretching'
+      ],
+      howTo: 'Focus on deep breathing and gradual stretching to improve flexibility.'
+    },
+    {
+      name: 'Core Crusher',
+      description: 'Strengthen your core with targeted exercises',
+      repRange: '15-20 reps',
+      duration: '40 min',
+      intensity: 'Medium',
+      exercises: [
+        'Plank Variations',
+        'Russian Twists',
+        'Leg Raises',
+        'Cable Crunches',
+        'Bicycle Crunches'
+      ],
+      howTo: 'Engage your core throughout each exercise for maximum effectiveness.'
+    },
+    {
+      name: 'Upper Body Power',
+      description: 'Build upper body strength and power',
+      repRange: '6-10 reps',
+      duration: '55 min',
+      intensity: 'High',
+      exercises: [
+        'Pull-Ups',
+        'Dips',
+        'Push-Ups',
+        'Dumbbell Press',
+        'Tricep Extensions'
+      ],
+      howTo: 'Focus on explosive movements and proper form to build upper body power.'
+    },
+    {
+      name: 'Lower Body Strength',
+      description: 'Strengthen your lower body with heavy lifts',
+      repRange: '8-12 reps',
+      duration: '60 min',
+      intensity: 'High',
+      exercises: [
+        'Squats',
+        'Lunges',
+        'Leg Press',
+        'Calf Raises',
+        'Romanian Deadlifts'
+      ],
+      howTo: 'Use heavy weights and focus on form to build lower body strength.'
     }
   ];
 
@@ -548,7 +642,7 @@ const WorkoutScreen = () => {
             <TouchableOpacity
               key={workout.name}
               style={styles.workoutCard}
-              onPress={() => router.push({ pathname: '/active-workout', params: { type: workout.name } })}
+              onPress={() => startWorkout(workout)}
             >
               <View>
                 <View style={styles.workoutHeader}>
@@ -571,7 +665,7 @@ const WorkoutScreen = () => {
                   ))}
                 </View>
               </View>
-              <TouchableOpacity style={styles.startButton} onPress={() => router.push({ pathname: '/active-workout', params: { type: workout.name } })}>
+              <TouchableOpacity style={styles.startButton} onPress={() => startWorkout(workout)}>
                 <Text style={styles.startButtonText}>Start Workout</Text>
               </TouchableOpacity>
             </TouchableOpacity>

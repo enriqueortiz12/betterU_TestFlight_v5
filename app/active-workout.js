@@ -1725,8 +1725,8 @@ const ActiveWorkoutScreen = () => {
         return;
       }
 
-      // Update tracking stats
-      const minutesWorked = Math.floor(elapsedTime / 60);
+        // Update tracking stats
+        const minutesWorked = Math.floor(elapsedTime / 60);
       await incrementStat('workouts', 1);
       await incrementStat('minutes', minutesWorked);
 
@@ -2029,25 +2029,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     paddingTop: 60,
+    backgroundColor: '#000000',
+    zIndex: 1,
   },
   closeButton: {
     padding: 8,
+    zIndex: 2,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
+    flex: 1,
+    textAlign: 'center',
   },
   finishButton: {
     backgroundColor: '#00ffff',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 20,
+    minWidth: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+    elevation: 5,
   },
   finishButtonText: {
     color: '#000',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   stats: {
     flexDirection: 'row',

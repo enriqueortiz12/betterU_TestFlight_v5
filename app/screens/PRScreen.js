@@ -416,83 +416,83 @@ const PRScreen = () => {
     const targetValue = getWeightUnit() === 'lbs' ? kgToLbs(pr.target_value) : pr.target_value;
 
     return (
-      <View key={pr.id} style={styles.prCard}>
-        <LinearGradient
-          colors={['#111', '#000']}
-          style={styles.prCardGradient}
-        >
-          <View style={styles.prContent}>
-            <View style={styles.prHeader}>
-              <Text style={styles.prExercise}>{pr.exercise}</Text>
-              <View style={styles.prActions}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => startEditing(pr)}
-                >
-                  <Ionicons name="pencil" size={20} color="#00ffff" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => handleDeletePress(pr)}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#ff4444" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.prStats}>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Current</Text>
-                <Text style={styles.statValue}>
-                  {formatWeight(currentValue, getWeightUnit())}
-                </Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Target</Text>
-                <Text style={styles.statValue}>
-                  {formatWeight(targetValue, getWeightUnit())}
-                </Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Progress</Text>
-                <Text style={styles.statValue}>
-                  {formatPercentage(calculateProgress(currentValue, targetValue))}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.progressBarContainer}>
-              <LinearGradient
-                colors={['#00ffff', '#0088ff']}
-                style={[
-                  styles.progressFill,
-                  { 
-                    width: `${calculateProgress(currentValue, targetValue)}%`
-                  }
-                ]}
-              />
-            </View>
-
-            <View style={styles.cardFooter}>
-              <Text style={styles.estimatedTime}>
-                Est. completion: {calculateETA(currentValue, targetValue)}
-              </Text>
+    <View key={pr.id} style={styles.prCard}>
+      <LinearGradient
+        colors={['#111', '#000']}
+        style={styles.prCardGradient}
+      >
+        <View style={styles.prContent}>
+          <View style={styles.prHeader}>
+            <Text style={styles.prExercise}>{pr.exercise}</Text>
+            <View style={styles.prActions}>
               <TouchableOpacity
-                style={styles.detailsButton}
+                style={styles.actionButton}
+                onPress={() => startEditing(pr)}
+              >
+                <Ionicons name="pencil" size={20} color="#00ffff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleDeletePress(pr)}
+              >
+                <Ionicons name="trash-outline" size={20} color="#ff4444" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.prStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Current</Text>
+              <Text style={styles.statValue}>
+                  {formatWeight(currentValue, getWeightUnit())}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Target</Text>
+              <Text style={styles.statValue}>
+                  {formatWeight(targetValue, getWeightUnit())}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Progress</Text>
+              <Text style={styles.statValue}>
+                  {formatPercentage(calculateProgress(currentValue, targetValue))}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.progressBarContainer}>
+            <LinearGradient
+              colors={['#00ffff', '#0088ff']}
+              style={[
+                styles.progressFill,
+                { 
+                    width: `${calculateProgress(currentValue, targetValue)}%`
+                }
+              ]}
+            />
+          </View>
+
+          <View style={styles.cardFooter}>
+            <Text style={styles.estimatedTime}>
+                Est. completion: {calculateETA(currentValue, targetValue)}
+            </Text>
+            <TouchableOpacity
+              style={styles.detailsButton}
                 onPress={() => handleViewProgress({
                   ...pr,
                   current_value: currentValue,
                   target_value: targetValue
                 })}
-              >
-                <Text style={styles.detailsButtonText}>Details</Text>
-                <Ionicons name="chevron-forward" size={16} color="#00ffff" />
-              </TouchableOpacity>
-            </View>
+            >
+              <Text style={styles.detailsButtonText}>Details</Text>
+              <Ionicons name="chevron-forward" size={16} color="#00ffff" />
+            </TouchableOpacity>
           </View>
-        </LinearGradient>
-      </View>
-    );
+        </View>
+      </LinearGradient>
+    </View>
+  );
   };
 
   return (
@@ -684,6 +684,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    padding: 20,
   },
   prList: {
     padding: 15,
@@ -862,7 +863,7 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: '#222',
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 15,
     color: '#fff',
     fontSize: 16,
@@ -938,6 +939,11 @@ const styles = StyleSheet.create({
   chartSection: {
     marginTop: 20,
     width: '100%',
+    backgroundColor: '#111',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#222',
   },
   sectionTitle: {
     fontSize: 18,

@@ -32,40 +32,31 @@ export const TrackingProvider = ({ children }) => {
   useEffect(() => {
     const loadSavedData = async () => {
       try {
-        // Load goals first
-        const savedCalorieGoal = await AsyncStorage.getItem('calorieGoal');
-        const savedWaterGoal = await AsyncStorage.getItem('waterGoal');
-        
-        if (savedCalorieGoal) {
-          setCalories(prev => ({ ...prev, goal: parseInt(savedCalorieGoal) }));
-        }
-        if (savedWaterGoal) {
-          setWater(prev => ({ ...prev, goal: parseFloat(savedWaterGoal) }));
-        }
-
-        // Load other data
+        // Load calories and water from AsyncStorage
         const savedCalories = await AsyncStorage.getItem('calories');
         const savedWater = await AsyncStorage.getItem('water');
-        const savedMood = await AsyncStorage.getItem('mood');
-        const savedStats = await AsyncStorage.getItem('stats');
 
         if (savedCalories) {
-          const parsedCalories = JSON.parse(savedCalories);
-          setCalories(prev => ({ ...prev, consumed: parsedCalories.consumed }));
+          setCalories(JSON.parse(savedCalories));
         }
         if (savedWater) {
-          const parsedWater = JSON.parse(savedWater);
-          setWater(prev => ({ ...prev, consumed: parsedWater.consumed }));
+          setWater(JSON.parse(savedWater));
         }
-        if (savedMood) setMood(savedMood);
-        if (savedStats) setStats(JSON.parse(savedStats));
 
         // Initialize or load user stats from Supabase
         if (user) {
+          // Get stats from user_stats table
           const { data: statsData } = await supabase
             .from('user_stats')
             .select('*')
             .eq('user_id', user.id)
+            .single();
+
+          // Get streak data from profiles table
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('streak, longest_streak, last_streak_update')
+            .eq('id', user.id)
             .single();
 
           if (statsData) {
@@ -73,7 +64,8 @@ export const TrackingProvider = ({ children }) => {
               ...prev,
               ...statsData,
               today_workout_completed: statsData.today_workout_completed || false,
-              today_mental_completed: statsData.today_mental_completed || false
+              today_mental_completed: statsData.today_mental_completed || false,
+              streak: profileData?.streak || 0
             }));
           } else {
             // Initialize stats with default values
@@ -83,7 +75,7 @@ export const TrackingProvider = ({ children }) => {
               minutes: 0,
               mental_sessions: 0,
               prs_this_month: 0,
-              streak: 0,
+              streak: profileData?.streak || 0,
               today_workout_completed: false,
               today_mental_completed: false,
               updated_at: new Date().toISOString()
@@ -160,15 +152,15 @@ export const TrackingProvider = ({ children }) => {
           if (streakData) {
             newStreak = streakData.current_streak + 1;
             // Update streak in Supabase
-            await supabase
+          await supabase
               .from('betteru_streaks')
               .upsert({
-                user_id: user.id,
+              user_id: user.id,
                 current_streak: newStreak,
                 longest_streak: Math.max(newStreak, streakData.longest_streak),
                 last_completed_date: yesterdayStr,
-                updated_at: new Date().toISOString()
-              });
+              updated_at: new Date().toISOString()
+            });
           }
         } else {
           // Reset streak if activities were not completed
@@ -227,20 +219,20 @@ export const TrackingProvider = ({ children }) => {
       await AsyncStorage.setItem('calories', JSON.stringify(newCalories));
 
       if (user) {
-        const today = new Date().toISOString().split('T')[0];
-        
+      const today = new Date().toISOString().split('T')[0];
+
         // First check if entry exists
         const { data: existingEntry } = await supabase
-          .from('calorie_tracking')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('date', today)
-          .single();
+        .from('calorie_tracking')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .single();
 
         if (existingEntry) {
           // Update existing entry
           const { error } = await supabase
-            .from('calorie_tracking')
+          .from('calorie_tracking')
             .update({
               consumed: newCalories.consumed,
               goal: newCalories.goal,
@@ -250,22 +242,22 @@ export const TrackingProvider = ({ children }) => {
 
           if (error) {
             console.error('Error updating calorie tracking:', error);
-          }
-        } else {
+        }
+      } else {
           // Insert new entry
           const { error } = await supabase
             .from('calorie_tracking')
-            .insert({
-              user_id: user.id,
-              date: today,
+          .insert({
+            user_id: user.id,
+            date: today,
               consumed: newCalories.consumed,
               goal: newCalories.goal,
-              updated_at: new Date().toISOString()
-            });
+          updated_at: new Date().toISOString()
+        });
 
           if (error) {
             console.error('Error inserting calorie tracking:', error);
-          }
+      }
         }
       }
     } catch (error) {
@@ -306,15 +298,15 @@ export const TrackingProvider = ({ children }) => {
           }
         } else {
           // Insert new entry
-          const { error } = await supabase
-            .from('water_tracking')
+      const { error } = await supabase
+        .from('water_tracking')
             .insert({
-              user_id: user.id,
-              date: today,
+          user_id: user.id,
+            date: today,
               consumed: newWater.consumed,
               goal: newWater.goal,
-              updated_at: new Date().toISOString()
-            });
+          updated_at: new Date().toISOString()
+        });
 
           if (error) {
             console.error('Error inserting water tracking:', error);
@@ -340,8 +332,8 @@ export const TrackingProvider = ({ children }) => {
         await AsyncStorage.setItem('waterGoal', amount.toString());
       }
 
-      if (user) {
-        const today = new Date().toISOString().split('T')[0];
+        if (user) {
+          const today = new Date().toISOString().split('T')[0];
         
         // First check if entry exists
         const { data: existingEntry } = await supabase
@@ -369,12 +361,12 @@ export const TrackingProvider = ({ children }) => {
           const { error } = await supabase
             .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
             .insert({
-              user_id: user.id,
+            user_id: user.id,
               date: today,
               goal: amount,
               consumed: type === 'calories' ? calories.consumed : water.consumed,
-              updated_at: new Date().toISOString()
-            });
+            updated_at: new Date().toISOString()
+          });
 
           if (error) {
             console.error('Error inserting goal:', error);
@@ -419,16 +411,16 @@ export const TrackingProvider = ({ children }) => {
       await AsyncStorage.setItem('stats', JSON.stringify(newStats));
 
       if (user) {
-        const { error } = await supabase
-          .from('user_stats')
-          .upsert({
-            user_id: user.id,
+      const { error } = await supabase
+        .from('user_stats')
+        .upsert({
+          user_id: user.id,
             ...newStats,
-            updated_at: new Date().toISOString()
-          });
+          updated_at: new Date().toISOString()
+        });
 
-        if (error) {
-          console.error('Error updating stats:', error);
+      if (error) {
+        console.error('Error updating stats:', error);
         }
       }
     } catch (error) {
@@ -538,16 +530,16 @@ export const TrackingProvider = ({ children }) => {
       }
 
       // Update the stats in Supabase with completion flags
-      const { error } = await supabase
-        .from('user_stats')
+        const { error } = await supabase
+          .from('user_stats')
         .update(updateData)
-        .eq('user_id', user.id);
+          .eq('user_id', user.id);
 
       if (error) throw error;
 
       // Only fetch and set latest stats from Supabase
       const { data: latestStats, error: fetchError } = await supabase
-        .from('user_stats')
+          .from('user_stats')
         .select('*')
         .eq('user_id', user.id)
         .single();

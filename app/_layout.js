@@ -7,6 +7,7 @@ import { TrackingProvider } from '../context/TrackingContext';
 import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { useState, useEffect } from 'react';
 import { preloadImages } from '../utils/imageUtils';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
@@ -41,25 +42,29 @@ export default function RootLayout() {
 
   if (!isReady) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#00ffff" />
-        <Text style={styles.loadingText}>{loadingStep}</Text>
-      </View>
+      <SafeAreaProvider>
+        <View style={styles.container}>
+          <ActivityIndicator size="large" color="#00ffff" />
+          <Text style={styles.loadingText}>{loadingStep}</Text>
+        </View>
+      </SafeAreaProvider>
     );
   }
 
   return (
-    <NavigationContainer>
-      <AuthProvider>
-        <UserProvider>
-          <UnitsProvider>
-            <TrackingProvider>
-              <Slot />
-            </TrackingProvider>
-          </UnitsProvider>
-        </UserProvider>
-      </AuthProvider>
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <AuthProvider>
+          <UserProvider>
+            <UnitsProvider>
+              <TrackingProvider>
+                <Slot />
+              </TrackingProvider>
+            </UnitsProvider>
+          </UserProvider>
+        </AuthProvider>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
 

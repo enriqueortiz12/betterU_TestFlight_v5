@@ -320,27 +320,27 @@ const ActiveMentalSession = () => {
         contentContainerStyle={styles.scrollViewContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Timer Circle */}
-        <View style={styles.timerContainer}>
-          <View style={styles.timerCircle}>
-            <Animated.View 
-              style={[
-                styles.progressCircle,
-                {
-                  transform: [{
-                    rotateZ: progressAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '360deg']
-                    })
-                  }]
-                }
-              ]}
-            />
-            <View style={styles.timerContent}>
-              <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
+      {/* Timer Circle */}
+      <View style={styles.timerContainer}>
+        <View style={styles.timerCircle}>
+          <Animated.View 
+            style={[
+              styles.progressCircle,
+              {
+                transform: [{
+                  rotateZ: progressAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg']
+                  })
+                }]
+              }
+            ]}
+          />
+          <View style={styles.timerContent}>
+            <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
               {/* Timer play/pause button: free users can use timer, only premium gets audio */}
-              <TouchableOpacity
-                style={[styles.timerButton, isActive && styles.timerButtonActive]}
+            <TouchableOpacity
+              style={[styles.timerButton, isActive && styles.timerButtonActive]}
                 onPress={() => {
                   setIsActive(!isActive);
                   if (isPremium) {
@@ -356,22 +356,22 @@ const ActiveMentalSession = () => {
                   }
                 }}
                 disabled={isPremium ? !sound : false}
-              >
-                <Ionicons 
-                  name={isActive ? "pause" : "play"} 
-                  size={30} 
-                  color={isActive ? "#000" : "#00ffff"} 
-                />
-              </TouchableOpacity>
-            </View>
+            >
+              <Ionicons 
+                name={isActive ? "pause" : "play"} 
+                size={30} 
+                color={isActive ? "#000" : "#00ffff"} 
+              />
+            </TouchableOpacity>
           </View>
+        </View>
           {/* Red upgrade message for free users */}
           {!isPremium && (
             <Text style={{ color: '#ff4444', textAlign: 'center', marginTop: 10, fontWeight: 'bold' }}>
               Upgrade to Premium to access guided audio for this session.
             </Text>
           )}
-        </View>
+      </View>
 
         {/* Audio Controls: only for premium users */}
         {isPremium && sound && (
@@ -401,39 +401,39 @@ const ActiveMentalSession = () => {
           </PremiumFeature>
         )}
 
-        {/* Current Step */}
-        <Animated.View 
-          style={[
-            styles.stepContainer, 
-            { 
-              opacity: fadeAnimation,
-              transform: [{
-                translateY: fadeAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [20, 0]
-                })
-              }]
-            }
-          ]}
-        >
-          <Text style={styles.stepNumber}>Step {currentStepIndex + 1}/{session.steps.length}</Text>
-          <Text style={styles.stepText}>{session.steps[currentStepIndex]}</Text>
-        </Animated.View>
+      {/* Current Step */}
+      <Animated.View 
+        style={[
+          styles.stepContainer, 
+          { 
+            opacity: fadeAnimation,
+            transform: [{
+              translateY: fadeAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [20, 0]
+              })
+            }]
+          }
+        ]}
+      >
+        <Text style={styles.stepNumber}>Step {currentStepIndex + 1}/{session.steps.length}</Text>
+        <Text style={styles.stepText}>{session.steps[currentStepIndex]}</Text>
+      </Animated.View>
 
-        {/* Description */}
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.descriptionText}>{session.description}</Text>
-        </View>
+      {/* Description */}
+      <View style={styles.descriptionContainer}>
+        <Text style={styles.descriptionText}>{session.description}</Text>
+      </View>
       </ScrollView>
 
       {/* Finish Button */}
       <View style={styles.finishButtonContainer}>
-        <TouchableOpacity
+      <TouchableOpacity
           style={styles.finishButton}
-          onPress={handleFinishSession}
-        >
-          <Text style={styles.finishButtonText}>Finish Session</Text>
-        </TouchableOpacity>
+        onPress={handleFinishSession}
+      >
+        <Text style={styles.finishButtonText}>Finish Session</Text>
+      </TouchableOpacity>
       </View>
     </View>
   );

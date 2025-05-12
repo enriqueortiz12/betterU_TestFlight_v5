@@ -202,12 +202,13 @@ const workoutData = {
       },
       {
         name: 'Barbell Rows',
-        targetMuscles: 'Back, Biceps',
+        targetMuscles: 'Back, Lats, Rear Delts, Biceps',
         instructions: [
-          'Bend at hips with back straight',
-          'Pull bar to lower chest',
-          'Squeeze shoulder blades together',
-          'Lower bar with control'
+          'Stand with feet hip-width apart, grip barbell with overhand grip',
+          'Hinge at hips, keep back straight and chest up',
+          'Pull barbell to lower chest, squeezing shoulder blades',
+          'Lower bar with control, keeping core tight',
+          'Repeat for reps'
         ],
         sets: [
           { weight: '', reps: '8-12', completed: false },
@@ -522,12 +523,13 @@ const workoutData = {
       },
       {
         name: 'Barbell Rows',
-        targetMuscles: 'Back, Biceps',
+        targetMuscles: 'Back, Lats, Rear Delts, Biceps',
         instructions: [
-          'Bend at hips with back straight',
-          'Pull bar to lower chest',
-          'Squeeze shoulder blades',
-          'Lower with control'
+          'Stand with feet hip-width apart, grip barbell with overhand grip',
+          'Hinge at hips, keep back straight and chest up',
+          'Pull barbell to lower chest, squeezing shoulder blades',
+          'Lower bar with control, keeping core tight',
+          'Repeat for reps'
         ],
         sets: [
           { weight: '', reps: '8-12', completed: false },
@@ -698,12 +700,13 @@ const workoutData = {
       },
       {
         name: 'Barbell Rows',
-        targetMuscles: 'Back, Biceps',
+        targetMuscles: 'Back, Lats, Rear Delts, Biceps',
         instructions: [
-          'Bend at hips, back straight',
-          'Pull bar to lower chest',
-          'Squeeze shoulder blades',
-          'Lower with control'
+          'Stand with feet hip-width apart, grip barbell with overhand grip',
+          'Hinge at hips, keep back straight and chest up',
+          'Pull barbell to lower chest, squeezing shoulder blades',
+          'Lower bar with control, keeping core tight',
+          'Repeat for reps'
         ],
         sets: [
           { weight: '', reps: '5', completed: false },
@@ -909,12 +912,13 @@ const workoutData = {
       },
       {
         name: 'Barbell Rows',
-        targetMuscles: 'Back, Biceps',
+        targetMuscles: 'Back, Lats, Rear Delts, Biceps',
         instructions: [
-          'Bend at hips with back straight',
-          'Pull bar explosively to chest',
-          'Squeeze shoulder blades together',
-          'Lower with control'
+          'Stand with feet hip-width apart, grip barbell with overhand grip',
+          'Hinge at hips, keep back straight and chest up',
+          'Pull barbell to lower chest, squeezing shoulder blades',
+          'Lower bar with control, keeping core tight',
+          'Repeat for reps'
         ],
         sets: [
           { weight: '', reps: '4-6', completed: false },
@@ -1291,12 +1295,13 @@ const workoutData = {
       },
       {
         name: 'Barbell Rows',
-        targetMuscles: 'Back, Rear Delts',
+        targetMuscles: 'Back, Lats, Rear Delts, Biceps',
         instructions: [
-          'Bend at hips',
-          'Keep back straight',
-          'Pull to lower chest',
-          'Squeeze shoulder blades'
+          'Stand with feet hip-width apart, grip barbell with overhand grip',
+          'Hinge at hips, keep back straight and chest up',
+          'Pull barbell to lower chest, squeezing shoulder blades',
+          'Lower bar with control, keeping core tight',
+          'Repeat for reps'
         ],
         sets: [
           { weight: '', reps: '10-12', completed: false },

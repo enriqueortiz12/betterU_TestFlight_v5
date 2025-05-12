@@ -136,7 +136,7 @@ const PRScreen = () => {
       fetchPRGoals();
       
       // Increment PRs count
-      incrementStat('prsThisMonth');
+      incrementStat('prs_this_month');
     } catch (error) {
       console.error('Error saving PR goal:', error);
     }

@@ -8,9 +8,10 @@ import { useEffect, useState } from 'react';
 import { useUnits } from '../../context/UnitsContext';
 import { useTracking } from '../../context/TrackingContext';
 import { supabase } from '../../lib/supabase';
+import PremiumFeature from '../components/PremiumFeature';
 
 const ProfileScreen = () => {
-  const { profile, refetchProfile, updateProfile } = useAuth();
+  const { profile, refetchProfile, updateProfile, isPremium } = useAuth();
   const { 
     convertWeight, 
     convertHeight, 
@@ -265,15 +266,20 @@ const ProfileScreen = () => {
             >
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.editButton, styles.saveButton]}
-              onPress={() => handleGoalEdit(
-                editingField === 'calorie_goal' ? 'calories' : 'water',
-                editValue
-              )}
-            >
-              <Text style={styles.buttonText}>Save</Text>
-            </TouchableOpacity>
+            <PremiumFeature isPremium={isPremium} onPress={() => handleGoalEdit(
+              editingField === 'calorie_goal' ? 'calories' : 'water',
+              editValue
+            )}>
+              <TouchableOpacity
+                style={[styles.editButton, styles.saveButton]}
+                onPress={() => handleGoalEdit(
+                  editingField === 'calorie_goal' ? 'calories' : 'water',
+                  editValue
+                )}
+              >
+                <Text style={styles.buttonText}>Save</Text>
+              </TouchableOpacity>
+            </PremiumFeature>
           </View>
         </View>
       );

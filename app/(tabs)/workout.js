@@ -5,6 +5,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 const WorkoutScreen = () => {
   const router = useRouter();
@@ -13,6 +14,7 @@ const WorkoutScreen = () => {
   const [monthlyWorkouts, setMonthlyWorkouts] = useState(0);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [userWorkouts, setUserWorkouts] = useState([]);
+  const { isPremium } = useAuth();
 
   const fetchWorkoutLogs = async () => {
     try {
@@ -159,6 +161,65 @@ const WorkoutScreen = () => {
       }
     });
   };
+
+  const premiumWorkouts = [
+    {
+      name: 'Athlete Power Circuit',
+      description: 'Explosive full-body circuit for athletes',
+      repRange: '8-10 reps',
+      duration: '50 min',
+      intensity: 'Elite',
+      exercises: [
+        'Power Cleans',
+        'Push Press',
+        'Box Jumps',
+        'Chin-Ups',
+        "Farmer's Walk"
+      ]
+    },
+    {
+      name: 'Glute & Core Sculpt',
+      description: 'Targeted glute and core workout for strength and shape',
+      repRange: '12-15 reps',
+      duration: '40 min',
+      intensity: 'High',
+      exercises: [
+        'Hip Thrusts',
+        'Cable Kickbacks',
+        'Plank Variations',
+        'Bulgarian Split Squats',
+        'Hanging Leg Raises'
+      ]
+    },
+    {
+      name: 'Ultimate Conditioning',
+      description: 'High-intensity conditioning for max calorie burn',
+      repRange: '30s work',
+      duration: '35 min',
+      intensity: 'Extreme',
+      exercises: [
+        'Battle Ropes',
+        'Sled Push',
+        'Burpee Pull-Ups',
+        'Rowing Sprints',
+        'Medicine Ball Slams'
+      ]
+    },
+    {
+      name: 'Push-Pull-Legs Pro',
+      description: 'Advanced PPL split for muscle growth',
+      repRange: '8-12 reps',
+      duration: '60 min',
+      intensity: 'Pro',
+      exercises: [
+        'Incline Barbell Press',
+        'Pendlay Rows',
+        'Walking Lunges',
+        'Arnold Press',
+        'Nordic Hamstring Curls'
+      ]
+    }
+  ];
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -475,6 +536,75 @@ const WorkoutScreen = () => {
             <Text style={styles.startButtonText}>Start Workout</Text>
           </TouchableOpacity>
         </TouchableOpacity>
+    </View>
+
+    {/* Premium Workouts Section */}
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Premium Workouts</Text>
+      {isPremium ? (
+        <>
+          <Text style={{ color: '#00ffff', fontWeight: 'bold', marginBottom: 8, fontSize: 16 }}>Premium</Text>
+          {premiumWorkouts.map((workout, idx) => (
+            <TouchableOpacity
+              key={workout.name}
+              style={styles.workoutCard}
+              onPress={() => router.push({ pathname: '/active-workout', params: { type: workout.name } })}
+            >
+              <View>
+                <View style={styles.workoutHeader}>
+                  <Text style={styles.workoutTitle}>{workout.name}</Text>
+                  <View style={styles.repRange}>
+                    <Text style={styles.repRangeText}>{workout.repRange}</Text>
+                  </View>
+                </View>
+                <Text style={styles.workoutDescription}>{workout.description}</Text>
+                <View style={styles.workoutMeta}>
+                  <Ionicons name="time-outline" size={20} color="#666" />
+                  <Text style={styles.metaText}>{workout.duration}</Text>
+                  <Ionicons name="flame-outline" size={20} color="#666" />
+                  <Text style={styles.metaText}>{workout.intensity}</Text>
+                </View>
+                <View style={styles.exercises}>
+                  <Text style={styles.exercisesTitle}>Exercises:</Text>
+                  {workout.exercises.map((ex, i) => (
+                    <Text key={i} style={styles.exercisesList}>• {ex}</Text>
+                  ))}
+                </View>
+              </View>
+              <TouchableOpacity style={styles.startButton} onPress={() => router.push({ pathname: '/active-workout', params: { type: workout.name } })}>
+                <Text style={styles.startButtonText}>Start Workout</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))}
+        </>
+      ) : (
+        <>
+          {premiumWorkouts.map((workout, idx) => (
+            <View key={workout.name} style={[styles.workoutCard, { opacity: 0.6 }]}> 
+              <View style={styles.workoutHeader}>
+                <Text style={styles.workoutTitle}>{workout.name}</Text>
+                <Ionicons name="lock-closed" size={22} color="#ff4444" style={{ marginLeft: 8 }} />
+              </View>
+              <Text style={styles.workoutDescription}>{workout.description}</Text>
+              <View style={styles.workoutMeta}>
+                <Ionicons name="time-outline" size={20} color="#666" />
+                <Text style={styles.metaText}>{workout.duration}</Text>
+                <Ionicons name="flame-outline" size={20} color="#666" />
+                <Text style={styles.metaText}>{workout.intensity}</Text>
+              </View>
+              <View style={styles.exercises}>
+                <Text style={styles.exercisesTitle}>Exercises:</Text>
+                {workout.exercises.map((ex, i) => (
+                  <Text key={i} style={styles.exercisesList}>• {ex}</Text>
+                ))}
+              </View>
+              <View style={{ alignItems: 'center', marginTop: 10 }}>
+                <Text style={{ color: '#ff4444', fontWeight: 'bold', fontSize: 14 }}>Upgrade to Premium to start these workouts</Text>
+              </View>
+            </View>
+          ))}
+        </>
+      )}
     </View>
 
     {/* Workout Logs Modal */}

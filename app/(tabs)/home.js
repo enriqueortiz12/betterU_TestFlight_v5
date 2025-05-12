@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTracking } from '../../context/TrackingContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';
+import PremiumFeature from '../components/PremiumFeature';
 
 // Add more motivational quotes
 const motivationalQuotes = [
@@ -28,18 +29,117 @@ const motivationalQuotes = [
   { text: "Don't wish for it, work for it.", author: "Unknown" },
   { text: "You are stronger than you think.", author: "Unknown" },
   { text: "Small steps are better than no steps.", author: "Unknown" },
-  { text: "Every rep counts, every set matters.", author: "Unknown" }
+  { text: "Every rep counts, every set matters.", author: "Unknown" },
+  { text: "Push yourself, because no one else is going to do it for you.", author: "Unknown" },
+  { text: "Great things never come from comfort zones.", author: "Unknown" },
+  { text: "Dream it. Wish it. Do it.", author: "Unknown" },
+  { text: "Success doesn't just find you. You have to go out and get it.", author: "Unknown" },
+  { text: "The harder you work, the luckier you get.", author: "Gary Player" },
+  { text: "Don't stop when you're tired. Stop when you're done.", author: "Marilyn Monroe" },
+  { text: "Wake up with determination. Go to bed with satisfaction.", author: "Unknown" },
+  { text: "Do something today that your future self will thank you for.", author: "Unknown" },
+  { text: "Little by little, a little becomes a lot.", author: "Tanzanian Proverb" },
+  { text: "If it doesn't challenge you, it won't change you.", author: "Fred DeVito" },
+  { text: "Don't limit your challenges. Challenge your limits.", author: "Jerry Dunn" },
+  { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
+  { text: "Energy and persistence conquer all things.", author: "Benjamin Franklin" },
+  { text: "Act as if what you do makes a difference. It does.", author: "William James" },
+  { text: "You miss 100% of the shots you don't take.", author: "Wayne Gretzky" },
+  { text: "I can do all things through Christ who strengthens me.", author: "Philippians 4:13" },
+  { text: "For God gave us a spirit not of fear but of power and love and self-control.", author: "2 Timothy 1:7" },
+  { text: "But those who hope in the Lord will renew their strength. They will soar on wings like eagles; they will run and not grow weary, they will walk and not be faint.", author: "Isaiah 40:31" },
+  { text: "Be strong and courageous. Do not be afraid; do not be discouraged, for the Lord your God will be with you wherever you go.", author: "Joshua 1:9" },
+  { text: "Commit to the Lord whatever you do, and he will establish your plans.", author: "Proverbs 16:3" },
+  // --- 60 more motivational quotes and Bible verses ---
+  { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
+  { text: "Act as if what you do makes a difference. It does.", author: "William James" },
+  { text: "Quality is not an act, it is a habit.", author: "Aristotle" },
+  { text: "With God all things are possible.", author: "Matthew 19:26" },
+  { text: "Let all that you do be done in love.", author: "1 Corinthians 16:14" },
+  { text: "He gives strength to the weary and increases the power of the weak.", author: "Isaiah 40:29" },
+  { text: "The Lord is my strength and my shield; my heart trusts in him, and he helps me.", author: "Psalm 28:7" },
+  { text: "When you go through deep waters, I will be with you.", author: "Isaiah 43:2" },
+  { text: "Cast all your anxiety on him because he cares for you.", author: "1 Peter 5:7" },
+  { text: "The best way to get started is to quit talking and begin doing.", author: "Walt Disney" },
+  { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
+  { text: "You are never too old to set another goal or to dream a new dream.", author: "C.S. Lewis" },
+  { text: "Start where you are. Use what you have. Do what you can.", author: "Arthur Ashe" },
+  { text: "Difficult roads often lead to beautiful destinations.", author: "Unknown" },
+  { text: "God is within her, she will not fall.", author: "Psalm 46:5" },
+  { text: "Be still, and know that I am God.", author: "Psalm 46:10" },
+  { text: "The Lord will fight for you; you need only to be still.", author: "Exodus 14:14" },
+  { text: "Let your light shine before others.", author: "Matthew 5:16" },
+  { text: "Faith does not make things easy, it makes them possible.", author: "Luke 1:37" },
+  { text: "God has not given us a spirit of fear, but of power and of love and of a sound mind.", author: "2 Timothy 1:7" },
+  { text: "The only limit to our realization of tomorrow will be our doubts of today.", author: "Franklin D. Roosevelt" },
+  { text: "You are braver than you believe, stronger than you seem, and smarter than you think.", author: "A.A. Milne" },
+  { text: "If you want to lift yourself up, lift up someone else.", author: "Booker T. Washington" },
+  { text: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
+  { text: "The only way to achieve the impossible is to believe it is possible.", author: "Charles Kingsleigh" },
+  { text: "God is our refuge and strength, an ever-present help in trouble.", author: "Psalm 46:1" },
+  { text: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.", author: "Jeremiah 29:11" },
+  { text: "Be strong and take heart, all you who hope in the Lord.", author: "Psalm 31:24" },
+  { text: "The Lord is my shepherd; I shall not want.", author: "Psalm 23:1" },
+  { text: "Trust in the Lord with all your heart and lean not on your own understanding.", author: "Proverbs 3:5" },
+  { text: "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.", author: "Galatians 6:9" },
+  { text: "Whatever you do, work at it with all your heart, as working for the Lord, not for human masters.", author: "Colossians 3:23" },
+  { text: "The Lord is my light and my salvation—whom shall I fear?", author: "Psalm 27:1" },
+  { text: "I sought the Lord, and he answered me; he delivered me from all my fears.", author: "Psalm 34:4" },
+  { text: "My flesh and my heart may fail, but God is the strength of my heart and my portion forever.", author: "Psalm 73:26" },
+  { text: "The steadfast love of the Lord never ceases; his mercies never come to an end; they are new every morning.", author: "Lamentations 3:22-23" },
+  { text: "He will cover you with his feathers, and under his wings you will find refuge.", author: "Psalm 91:4" },
+  { text: "The Lord is good, a refuge in times of trouble. He cares for those who trust in him.", author: "Nahum 1:7" },
+  { text: "For we live by faith, not by sight.", author: "2 Corinthians 5:7" },
+  { text: "The Lord your God is with you, the Mighty Warrior who saves.", author: "Zephaniah 3:17" },
+  { text: "He gives power to the weak and strength to the powerless.", author: "Isaiah 40:29" },
+  { text: "The Lord is near to all who call on him.", author: "Psalm 145:18" },
+  { text: "I will instruct you and teach you in the way you should go.", author: "Psalm 32:8" },
+  { text: "The Lord will keep you from all harm—he will watch over your life.", author: "Psalm 121:7" },
+  { text: "The Lord is my rock, my fortress and my deliverer.", author: "Psalm 18:2" },
+  { text: "He who dwells in the shelter of the Most High will rest in the shadow of the Almighty.", author: "Psalm 91:1" },
+  { text: "The Lord is compassionate and gracious, slow to anger, abounding in love.", author: "Psalm 103:8" },
+  { text: "The Lord is righteous in all his ways and faithful in all he does.", author: "Psalm 145:17" },
+  { text: "The Lord is my strength and my song; he has given me victory.", author: "Exodus 15:2" },
+  { text: "The Lord is my helper; I will not be afraid.", author: "Hebrews 13:6" },
+  { text: "The Lord is my portion, says my soul, therefore I will hope in him.", author: "Lamentations 3:24" },
+  { text: "The Lord is my refuge and my fortress, my God, in whom I trust.", author: "Psalm 91:2" },
+  { text: "The Lord is my deliverer.", author: "Psalm 18:2" },
+  { text: "The Lord is my shield.", author: "Psalm 28:7" },
+  { text: "The Lord is my salvation.", author: "Psalm 27:1" },
+  { text: "The Lord is my rock.", author: "Psalm 18:2" },
+  { text: "The Lord is my shepherd.", author: "Psalm 23:1" },
+  { text: "The Lord is my light.", author: "Psalm 27:1" },
+  { text: "The Lord is my strength.", author: "Psalm 28:7" },
+  { text: "The Lord is my song.", author: "Exodus 15:2" },
+  { text: "The Lord is my hope.", author: "Lamentations 3:24" },
+  { text: "The Lord is my peace.", author: "Ephesians 2:14" },
+  { text: "The Lord is my joy.", author: "Nehemiah 8:10" },
+  { text: "The Lord is my healer.", author: "Exodus 15:26" },
+  { text: "The Lord is my provider.", author: "Genesis 22:14" },
+  { text: "The Lord is my redeemer.", author: "Isaiah 47:4" },
+  { text: "The Lord is my comforter.", author: "2 Corinthians 1:3-4" },
+  { text: "The Lord is my friend.", author: "John 15:15" },
+  { text: "The Lord is my guide.", author: "Psalm 48:14" },
+  { text: "The Lord is my teacher.", author: "Psalm 32:8" },
+  { text: "The Lord is my counselor.", author: "Psalm 16:7" },
+  { text: "The Lord is my protector.", author: "Psalm 121:7" },
+  { text: "The Lord is my sustainer.", author: "Psalm 54:4" },
+  { text: "The Lord is my restorer.", author: "Psalm 23:3" },
+  { text: "The Lord is my avenger.", author: "Romans 12:19" },
 ];
 
 const HomeScreen = () => {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, isPremium } = useAuth();
   const { calories, water, mood, stats, addCalories, addWater, updateGoal } = useTracking();
   const [showCalorieModal, setShowCalorieModal] = useState(false);
   const [calorieInput, setCalorieInput] = useState('');
   const [showCustomWaterModal, setShowCustomWaterModal] = useState(false);
   const [waterInput, setWaterInput] = useState('');
-  const [currentQuote, setCurrentQuote] = useState(motivationalQuotes[0]);
+  const [currentQuote, setCurrentQuote] = useState(() => {
+    const randomIndex = Math.floor(Math.random() * motivationalQuotes.length);
+    return motivationalQuotes[randomIndex];
+  });
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [showGoalModal, setShowGoalModal] = useState(null);
   const [goalInput, setGoalInput] = useState('');
@@ -158,6 +258,9 @@ const HomeScreen = () => {
         <Text style={styles.streakDescription}>
           Complete both a workout and mental session daily to maintain your streak!
         </Text>
+        <Text style={{ color: '#00bfff', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+          Streak updates at midnight
+        </Text>
       </View>
 
       {/* Stats Grid */}
@@ -214,9 +317,6 @@ const HomeScreen = () => {
       <View style={styles.trackerCard}>
         <View style={styles.trackerHeader}>
           <Text style={styles.trackerTitle}>Calorie Tracker</Text>
-          <TouchableOpacity onPress={() => setShowGoalModal('calories')}>
-            <Ionicons name="settings-outline" size={20} color="#fff" />
-          </TouchableOpacity>
         </View>
         <Text style={styles.trackerProgress}>{calories.consumed} / {calories.goal} cal</Text>
         <View style={styles.progressBar}>
@@ -241,9 +341,6 @@ const HomeScreen = () => {
       <View style={styles.trackerCard}>
         <View style={styles.trackerHeader}>
           <Text style={styles.trackerTitle}>Water Tracker</Text>
-          <TouchableOpacity onPress={() => setShowGoalModal('water')}>
-            <Ionicons name="settings-outline" size={20} color="#fff" />
-          </TouchableOpacity>
         </View>
         <Text style={styles.trackerProgress}>{water.consumed}ml / {water.goal}L</Text>
         <View style={styles.progressBar}>
@@ -714,13 +811,13 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   streakContainer: {
-    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    backgroundColor: 'rgba(0, 200, 255, 0.10)',
     borderRadius: 15,
     padding: 20,
     marginHorizontal: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 107, 0.2)',
+    borderColor: 'rgba(0, 200, 255, 0.20)',
   },
   streakContent: {
     flexDirection: 'row',
@@ -737,14 +834,18 @@ const styles = StyleSheet.create({
   },
   streakValue: {
     fontSize: 24,
-    color: '#ff6b6b',
+    color: '#00e0ff',
     fontWeight: 'bold',
     marginTop: 4,
+    textShadowColor: '#00bfff',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   streakDescription: {
     fontSize: 14,
-    color: '#888',
+    color: '#00bfff',
     marginTop: 8,
+    fontWeight: '500',
   },
   activityStatus: {
     marginTop: 15,

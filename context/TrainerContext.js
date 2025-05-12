@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { generateAIResponse } from "../utils/aiUtils"
 import { useUser } from '../context/UserContext';
+import { useAuth } from './AuthContext';
 
 const TrainerContext = createContext();
 
@@ -12,6 +13,10 @@ export const TrainerProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [messageCount, setMessageCount] = useState(0);
   const { userProfile } = useUser();
+  const { isPremium } = useAuth();
+
+  // Set message limits
+  const MAX_DAILY_MESSAGES = isPremium ? 100 : 15;
 
   // Function to check if we need to reset message count
   const checkAndResetMessageCount = async () => {
@@ -92,6 +97,23 @@ export const TrainerProvider = ({ children }) => {
     try {
       // Check if we need to reset message count
       await checkAndResetMessageCount();
+
+      // Enforce message limit
+      if (messageCount >= MAX_DAILY_MESSAGES) {
+        if (!isPremium) {
+          // Show upsell message for free users
+          const aiMessage = {
+            id: (Date.now() + 1).toString(),
+            sender: "trainer",
+            message: "You've reached your daily limit of 15 messages. Upgrade to Premium for 100 messages per day!",
+            timestamp: new Date().toISOString(),
+          };
+          const finalConversations = [...conversations, aiMessage];
+          setConversations(finalConversations);
+          await AsyncStorage.setItem("trainerConversations", JSON.stringify(finalConversations));
+        }
+        return { success: false, error: "Message limit reached" };
+      }
 
       // Add user message
       const userMessage = {

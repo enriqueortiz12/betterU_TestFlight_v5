@@ -9,11 +9,11 @@ import { useTrainer } from '../../context/TrainerContext';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-
-const MAX_DAILY_MESSAGES = 20;
+import { useAuth } from '../../context/AuthContext';
 
 const TrainerScreen = () => {
   const router = useRouter();
+  const { isPremium } = useAuth();
   const { userProfile } = useUser();
   const { conversations, sendMessage, clearConversations, isLoading, messageCount } = useTrainer();
   const [input, setInput] = useState('');
@@ -108,6 +108,8 @@ const TrainerScreen = () => {
       </View>
     </Animated.View>
   );
+
+  const MAX_DAILY_MESSAGES = isPremium ? 100 : 15;
 
   return (
     <KeyboardAvoidingView 

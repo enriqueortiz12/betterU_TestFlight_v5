@@ -121,14 +121,14 @@ export const TrackingProvider = ({ children }) => {
         if (!user) return;
 
         const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const lastMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
         // Fetch the last reset date from the database
         const { data: statsData, error: statsError } = await supabase
           .from('user_stats')
           .select('last_reset_date, today_workout_completed, today_mental_completed')
           .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-          .limit(1)
           .single();
 
         if (statsError) {
@@ -136,6 +136,7 @@ export const TrackingProvider = ({ children }) => {
           return;
         }
 
+        // Only reset if we haven't reset today
         if (statsData && statsData.last_reset_date === today) {
           // Already reset today, do nothing
           return;
@@ -147,7 +148,6 @@ export const TrackingProvider = ({ children }) => {
         const yesterdayStr = yesterday.toISOString().split('T')[0];
 
         // If both activities were completed yesterday, maintain/increment streak
-        // If not, reset streak to 0
         let newStreak = 0;
         if (statsData && statsData.today_workout_completed && statsData.today_mental_completed) {
           // Fetch current streak
@@ -194,53 +194,29 @@ export const TrackingProvider = ({ children }) => {
           })
           .eq('user_id', user.id);
 
-        // Fetch the latest stats and set local state
-        const { data: latestStats, error: fetchError } = await supabase
-          .from('user_stats')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
+        // Reset local storage
+        await AsyncStorage.setItem('calories', JSON.stringify({ consumed: 0, goal: calories.goal }));
+        await AsyncStorage.setItem('water', JSON.stringify({ consumed: 0, goal: water.goal }));
 
-        if (!fetchError && latestStats) {
-          setStats({ ...latestStats });
-        }
-
-        // Reset calories and water as before
+        // Update local state
         setCalories(prev => ({ ...prev, consumed: 0 }));
         setWater(prev => ({ ...prev, consumed: 0 }));
-        await AsyncStorage.setItem('lastResetDate', today);
-        await AsyncStorage.removeItem('calories');
-        await AsyncStorage.removeItem('water');
-
-        // Update Supabase for calories and water
-        await supabase
-          .from('calorie_tracking')
-          .upsert({
-            user_id: user.id,
-            date: today,
-            consumed: 0,
-            goal: calories.goal,
-            updated_at: new Date().toISOString()
-          });
-
-        await supabase
-          .from('water_tracking')
-          .upsert({
-            user_id: user.id,
-            date: today,
-            consumed: 0,
-            goal: water.goal,
-            updated_at: new Date().toISOString()
-          });
+        setStats(prev => ({
+          ...prev,
+          today_workout_completed: false,
+          today_mental_completed: false,
+          streak: newStreak
+        }));
 
       } catch (error) {
-        console.error('Error in midnight reset check:', error);
+        console.error('Error in midnight reset:', error);
       }
     };
 
-    // Check every 30 seconds, but will only reset ONCE per day
-    const interval = setInterval(checkMidnightReset, 30000);
-    checkMidnightReset(); // Also run on mount
+    // Check for reset every minute
+    const interval = setInterval(checkMidnightReset, 60000);
+    checkMidnightReset(); // Initial check
+
     return () => clearInterval(interval);
   }, [user, calories.goal, water.goal]);
 

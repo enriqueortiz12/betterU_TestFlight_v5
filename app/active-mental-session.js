@@ -9,10 +9,11 @@ import { useTracking } from '../context/TrackingContext';
 import { supabase } from '../lib/supabase';
 import { Audio } from 'expo-av';
 import Slider from '@react-native-community/slider';
+import PremiumFeature from './components/PremiumFeature';
 
 const ActiveMentalSession = () => {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isPremium } = useAuth();
   const { incrementStat } = useTracking();
   const params = useLocalSearchParams();
   const [timeLeft, setTimeLeft] = useState(params.duration * 60);
@@ -73,6 +74,15 @@ const ActiveMentalSession = () => {
         if (soundRef.current) {
           await soundRef.current.unloadAsync();
         }
+        // Only load audio for premium users
+        if (!isPremium) {
+          soundRef.current = null;
+          if (isMounted) {
+            setSound(null);
+            setIsPlaying(false);
+          }
+          return;
+        }
         const audioFile = getAudioFile();
         console.log('Audio file for session', session.id, audioFile ? 'FOUND' : 'NOT FOUND');
         if (audioFile) {
@@ -112,7 +122,7 @@ const ActiveMentalSession = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.id]);
+  }, [session.id, isPremium]);
 
   // Play audio when session is activated
   useEffect(() => {
@@ -328,21 +338,24 @@ const ActiveMentalSession = () => {
             />
             <View style={styles.timerContent}>
               <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
+              {/* Timer play/pause button: free users can use timer, only premium gets audio */}
               <TouchableOpacity
                 style={[styles.timerButton, isActive && styles.timerButtonActive]}
                 onPress={() => {
-                  if (!sound) {
-                    console.log('Play pressed but sound is not loaded');
-                    return;
-                  }
                   setIsActive(!isActive);
-                  if (!isActive) {
-                    sound && sound.playAsync();
-                  } else {
-                    sound && sound.pauseAsync();
+                  if (isPremium) {
+                    if (!sound) {
+                      console.log('Play pressed but sound is not loaded');
+                      return;
+                    }
+                    if (!isActive) {
+                      sound && sound.playAsync();
+                    } else {
+                      sound && sound.pauseAsync();
+                    }
                   }
                 }}
-                disabled={!sound}
+                disabled={isPremium ? !sound : false}
               >
                 <Ionicons 
                   name={isActive ? "pause" : "play"} 
@@ -352,32 +365,40 @@ const ActiveMentalSession = () => {
               </TouchableOpacity>
             </View>
           </View>
+          {/* Red upgrade message for free users */}
+          {!isPremium && (
+            <Text style={{ color: '#ff4444', textAlign: 'center', marginTop: 10, fontWeight: 'bold' }}>
+              Upgrade to Premium to access guided audio for this session.
+            </Text>
+          )}
         </View>
 
-        {/* Audio Controls */}
-        {sound && (
-          <View style={styles.audioControls}>
-            <TouchableOpacity onPress={toggleMute} style={styles.muteButton}>
-              <Ionicons 
-                name={isMuted ? "volume-mute" : "volume-high"} 
-                size={24} 
-                color="#00ffff" 
+        {/* Audio Controls: only for premium users */}
+        {isPremium && sound && (
+          <PremiumFeature isPremium={isPremium} onPress={() => {}}>
+            <View style={styles.audioControls}>
+              <TouchableOpacity onPress={toggleMute} style={styles.muteButton}>
+                <Ionicons 
+                  name={isMuted ? "volume-mute" : "volume-high"} 
+                  size={24} 
+                  color="#00ffff" 
+                />
+              </TouchableOpacity>
+              <Slider
+                style={styles.volumeSlider}
+                minimumValue={0}
+                maximumValue={1}
+                value={isMuted ? 0 : volume}
+                onValueChange={handleVolumeChange}
+                minimumTrackTintColor="#00ffff"
+                maximumTrackTintColor="rgba(0, 255, 255, 0.3)"
+                thumbTintColor="#00ffff"
               />
-            </TouchableOpacity>
-            <Slider
-              style={styles.volumeSlider}
-              minimumValue={0}
-              maximumValue={1}
-              value={isMuted ? 0 : volume}
-              onValueChange={handleVolumeChange}
-              minimumTrackTintColor="#00ffff"
-              maximumTrackTintColor="rgba(0, 255, 255, 0.3)"
-              thumbTintColor="#00ffff"
-            />
-            <TouchableOpacity onPress={replayAudio} style={styles.muteButton}>
-              <Ionicons name="refresh" size={24} color="#00ffff" />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity onPress={replayAudio} style={styles.muteButton}>
+                <Ionicons name="refresh" size={24} color="#00ffff" />
+              </TouchableOpacity>
+            </View>
+          </PremiumFeature>
         )}
 
         {/* Current Step */}

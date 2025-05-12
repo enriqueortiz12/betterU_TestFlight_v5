@@ -5,10 +5,11 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useUnits } from '../context/UnitsContext';
 import { useTracking } from '../context/TrackingContext';
+import PremiumFeature from './components/PremiumFeature';
 
 const SettingsScreen = () => {
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, isPremium } = useAuth();
   const { useImperial, toggleUnits } = useUnits();
   const { calories, water, updateGoal } = useTracking();
   const [editingField, setEditingField] = useState(null);
@@ -56,6 +57,23 @@ const SettingsScreen = () => {
         <Text style={styles.title}>Settings</Text>
       </View>
 
+      {/* Go Premium button for free users */}
+      {!isPremium && (
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#00ffff',
+            borderRadius: 10,
+            padding: 14,
+            alignItems: 'center',
+            marginBottom: 20,
+            marginHorizontal: 20,
+          }}
+          onPress={() => router.push('/purchase-subscription')}
+        >
+          <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 18 }}>Go Premium</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Preferences</Text>
         <View style={styles.card}>
@@ -69,36 +87,94 @@ const SettingsScreen = () => {
             />
           </View>
 
-          <View style={[styles.settingRow, styles.settingRowWithBorder]}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Calorie Goal</Text>
-              <Text style={styles.settingValue}>{calories.goal} cal</Text>
+          <View style={[styles.settingRow, styles.settingRowWithBorder, { flexDirection: 'column', alignItems: 'flex-start' }]}> 
+            <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Calorie Goal</Text>
+                <Text style={styles.settingValue}>{calories.goal} cal</Text>
+              </View>
+              <View style={{ position: 'relative', width: 35, height: 35 }}>
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => {
+                    if (isPremium) {
+                      setEditingField('calorie_goal');
+                      setEditValue(calories.goal.toString());
+                    }
+                  }}
+                  disabled={!isPremium}
+                >
+                  <Ionicons name="pencil" size={20} color="#00ffff" />
+                </TouchableOpacity>
+                {!isPremium && (
+                  <View style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: 'rgba(0,0,0,0.45)',
+                    borderRadius: 17.5,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2,
+                    pointerEvents: 'auto',
+                  }}>
+                    <Ionicons name="lock-closed" size={28} color="#fff" style={{ opacity: 0.85 }} />
+                  </View>
+                )}
+              </View>
             </View>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => {
-                setEditingField('calorie_goal');
-                setEditValue(calories.goal.toString());
-              }}
-            >
-              <Ionicons name="pencil" size={20} color="#00ffff" />
-            </TouchableOpacity>
+            {!isPremium && (
+              <Text style={{ color: '#ff4444', fontSize: 13, textAlign: 'center', marginTop: 8, alignSelf: 'center', width: '100%', fontWeight: '500', letterSpacing: 0.1 }}>
+                Upgrade to Premium in the settings
+              </Text>
+            )}
           </View>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Water Goal</Text>
-              <Text style={styles.settingValue}>{water.goal} L</Text>
+          <View style={[styles.settingRow, styles.settingRowWithBorder, { flexDirection: 'column', alignItems: 'flex-start' }]}> 
+            <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Water Goal</Text>
+                <Text style={styles.settingValue}>{water.goal} L</Text>
+              </View>
+              <View style={{ position: 'relative', width: 35, height: 35 }}>
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => {
+                    if (isPremium) {
+                      setEditingField('water_goal');
+                      setEditValue(water.goal.toString());
+                    }
+                  }}
+                  disabled={!isPremium}
+                >
+                  <Ionicons name="pencil" size={20} color="#00ffff" />
+                </TouchableOpacity>
+                {!isPremium && (
+                  <View style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: 'rgba(0,0,0,0.45)',
+                    borderRadius: 17.5,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2,
+                    pointerEvents: 'auto',
+                  }}>
+                    <Ionicons name="lock-closed" size={28} color="#fff" style={{ opacity: 0.85 }} />
+                  </View>
+                )}
+              </View>
             </View>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => {
-                setEditingField('water_goal');
-                setEditValue(water.goal.toString());
-              }}
-            >
-              <Ionicons name="pencil" size={20} color="#00ffff" />
-            </TouchableOpacity>
+            {!isPremium && (
+              <Text style={{ color: '#ff4444', fontSize: 13, textAlign: 'center', marginTop: 8, alignSelf: 'center', width: '100%', fontWeight: '500', letterSpacing: 0.1 }}>
+                Upgrade to Premium in the settings
+              </Text>
+            )}
           </View>
         </View>
       </View>

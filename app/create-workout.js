@@ -3,6 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import PremiumFeature from './components/PremiumFeature';
+import { useAuth } from '../context/AuthContext';
 
 const popularExercises = [
   // Chest
@@ -28,32 +30,44 @@ const CreateWorkoutScreen = () => {
   const [workoutName, setWorkoutName] = useState('');
   const [selectedExercises, setSelectedExercises] = useState([]);
   const [saving, setSaving] = useState(false);
+  const { isPremium } = useAuth();
+
+  // Debug log
+  console.log('CreateWorkoutScreen: isPremium =', isPremium);
 
   const toggleExercise = (exercise) => {
-    if (selectedExercises.some(e => e.name === exercise)) {
-      setSelectedExercises(selectedExercises.filter(e => e.name !== exercise));
-    } else {
-      setSelectedExercises([...selectedExercises, { name: exercise, sets: '3', reps: '10' }]);
+    try {
+      if (selectedExercises.some(e => e.name === exercise)) {
+        setSelectedExercises(selectedExercises.filter(e => e.name !== exercise));
+      } else {
+        setSelectedExercises([...selectedExercises, { name: exercise, sets: '3', reps: '10' }]);
+      }
+    } catch (err) {
+      console.error('toggleExercise error:', err);
     }
   };
 
   const updateExerciseField = (exercise, field, value) => {
-    setSelectedExercises(selectedExercises.map(e =>
-      e.name === exercise ? { ...e, [field]: value } : e
-    ));
+    try {
+      setSelectedExercises(selectedExercises.map(e =>
+        e.name === exercise ? { ...e, [field]: value } : e
+      ));
+    } catch (err) {
+      console.error('updateExerciseField error:', err);
+    }
   };
 
   const handleSave = async () => {
-    if (!workoutName.trim()) {
-      Alert.alert('Please enter a workout name.');
-      return;
-    }
-    if (selectedExercises.length === 0) {
-      Alert.alert('Please select at least one exercise.');
-      return;
-    }
-    setSaving(true);
     try {
+      if (!workoutName.trim()) {
+        Alert.alert('Please enter a workout name.');
+        return;
+      }
+      if (selectedExercises.length === 0) {
+        Alert.alert('Please select at least one exercise.');
+        return;
+      }
+      setSaving(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not found');
       const { error } = await supabase
@@ -69,6 +83,7 @@ const CreateWorkoutScreen = () => {
       Alert.alert('Workout saved!');
       router.replace('/(tabs)/workout');
     } catch (err) {
+      console.error('handleSave error:', err);
       Alert.alert('Error', err.message || 'Failed to save workout.');
     } finally {
       setSaving(false);
@@ -76,67 +91,79 @@ const CreateWorkoutScreen = () => {
   };
 
   return (
-    <View style={styles.screenContainer}>
-      {/* Exit Button */}
-      <TouchableOpacity style={styles.exitButton} onPress={() => router.replace('/(tabs)/workout')}>
-        <Ionicons name="close" size={28} color="#00ffff" />
-      </TouchableOpacity>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Create Workout</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Workout Name"
-          placeholderTextColor="#888"
-          value={workoutName}
-          onChangeText={setWorkoutName}
-        />
-        <Text style={styles.sectionTitle}>Select Exercises</Text>
-        {popularExercises.map((exercise) => {
-          const selected = selectedExercises.some(e => e.name === exercise);
-          const exerciseObj = selectedExercises.find(e => e.name === exercise);
-          return (
-            <View key={exercise} style={styles.exerciseRow}>
-              <TouchableOpacity
-                style={[styles.checkbox, selected && styles.checkboxSelected]}
-                onPress={() => toggleExercise(exercise)}
-              >
-                {selected && <Ionicons name="checkmark" size={18} color="#fff" />}
-              </TouchableOpacity>
-              <Text style={styles.exerciseName}>{exercise}</Text>
-              {selected && (
-                <>
-                  <TextInput
-                    style={styles.setsInput}
-                    value={exerciseObj.sets}
-                    onChangeText={val => updateExerciseField(exercise, 'sets', val)}
-                    keyboardType="numeric"
-                    placeholder="Sets"
-                    placeholderTextColor="#888"
-                  />
-                  <Text style={styles.xText}>x</Text>
-                  <TextInput
-                    style={styles.repsInput}
-                    value={exerciseObj.reps}
-                    onChangeText={val => updateExerciseField(exercise, 'reps', val)}
-                    keyboardType="numeric"
-                    placeholder="Reps"
-                    placeholderTextColor="#888"
-                  />
-                </>
-              )}
-            </View>
-          );
-        })}
-        {/* Save Workout button styled like original Training Plans button */}
-        <TouchableOpacity
-          style={styles.trainingPlansButton}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          <Ionicons name="save" size={20} color="#00ffff" style={{marginRight: 6}} />
-          <Text style={styles.trainingPlansButtonText}>{saving ? 'Saving...' : 'Save Workout'}</Text>
+    <View style={{ flex: 1 }}>
+      <View style={styles.screenContainer}>
+        {/* Exit Button */}
+        <TouchableOpacity style={styles.exitButton} onPress={() => router.replace('/(tabs)/workout')}>
+          <Ionicons name="close" size={28} color="#00ffff" />
         </TouchableOpacity>
-      </ScrollView>
+        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+          <Text style={styles.title}>Create Workout</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Workout Name"
+            placeholderTextColor="#888"
+            value={workoutName}
+            onChangeText={setWorkoutName}
+          />
+          <Text style={styles.sectionTitle}>Select Exercises</Text>
+          {popularExercises.map((exercise) => {
+            const selected = selectedExercises.some(e => e.name === exercise);
+            const exerciseObj = selectedExercises.find(e => e.name === exercise);
+            return (
+              <View key={exercise} style={styles.exerciseRow}>
+                <TouchableOpacity
+                  style={[styles.checkbox, selected && styles.checkboxSelected]}
+                  onPress={() => toggleExercise(exercise)}
+                >
+                  {selected && <Ionicons name="checkmark" size={18} color="#fff" />}
+                </TouchableOpacity>
+                <Text style={styles.exerciseName}>{exercise}</Text>
+                {selected && (
+                  <>
+                    <TextInput
+                      style={styles.setsInput}
+                      value={exerciseObj.sets}
+                      onChangeText={val => updateExerciseField(exercise, 'sets', val)}
+                      keyboardType="numeric"
+                      placeholder="Sets"
+                      placeholderTextColor="#888"
+                    />
+                    <Text style={styles.xText}>x</Text>
+                    <TextInput
+                      style={styles.repsInput}
+                      value={exerciseObj.reps}
+                      onChangeText={val => updateExerciseField(exercise, 'reps', val)}
+                      keyboardType="numeric"
+                      placeholder="Reps"
+                      placeholderTextColor="#888"
+                    />
+                  </>
+                )}
+              </View>
+            );
+          })}
+          {/* Show message for free users */}
+          {!isPremium && (
+            <Text style={{ color: '#ff4444', textAlign: 'center', marginBottom: 10 }}>
+              Upgrade to Premium to create custom workouts!
+            </Text>
+          )}
+          {/* Save Workout button styled like original Training Plans button */}
+          <View style={{ position: 'relative', width: '100%', alignItems: 'center' }}>
+            <TouchableOpacity
+              style={styles.trainingPlansButton}
+              onPress={handleSave}
+              disabled={!isPremium}
+            >
+              <Text style={styles.trainingPlansButtonText}>Save Workout</Text>
+              {!isPremium && (
+                <Ionicons name="lock-closed" size={22} color="#fff" style={{ marginLeft: 8 }} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
     </View>
   );
 };

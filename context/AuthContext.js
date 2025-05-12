@@ -11,6 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null)
   const [session, setSession] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isPremium, setIsPremium] = useState(false)
 
   // Update the fetchProfile function to properly handle RLS
   const fetchProfile = useCallback(async (userId) => {
@@ -115,6 +116,43 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // Fetch subscription status from Supabase
+  const fetchSubscriptionStatus = useCallback(async (userId) => {
+    try {
+      if (!userId) {
+        console.log('fetchSubscriptionStatus: No userId provided');
+        setIsPremium(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('end_date', { ascending: false })
+        .limit(1)
+        .single();
+      if (error) {
+        console.error('fetchSubscriptionStatus: Error fetching subscription:', error);
+        setIsPremium(false);
+        return;
+      }
+      console.log('fetchSubscriptionStatus: Fetched subscription row:', data);
+      let isPremium = false;
+      if (data) {
+        const now = new Date();
+        const endDate = data.end_date ? new Date(data.end_date) : null;
+        isPremium =
+          data.status === 'active' &&
+          (!endDate || endDate > now);
+      }
+      console.log('fetchSubscriptionStatus: Computed isPremium =', isPremium, 'from status =', data?.status, 'end_date =', data?.end_date);
+      setIsPremium(isPremium);
+    } catch (error) {
+      console.error('fetchSubscriptionStatus: Exception:', error);
+      setIsPremium(false);
+    }
+  }, []);
+
   // Update the auth state change handler to be more robust
   useEffect(() => {
     console.log("AuthContext: Setting up auth state listeners")
@@ -136,6 +174,7 @@ export const AuthProvider = ({ children }) => {
               setUser(session?.user ?? null);
               if (session?.user?.id) {
                 await fetchProfile(session.user.id);
+                await fetchSubscriptionStatus(session.user.id);
               }
             }
             break;
@@ -146,6 +185,7 @@ export const AuthProvider = ({ children }) => {
               if (mounted) {
                 setSession(null);
                 setUser(null);
+                setIsPremium(false);
               }
             } else {
               await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
@@ -157,6 +197,7 @@ export const AuthProvider = ({ children }) => {
         if (mounted) {
           setSession(null);
           setUser(null);
+          setIsPremium(false);
         }
       } finally {
         if (mounted) {
@@ -181,8 +222,10 @@ export const AuthProvider = ({ children }) => {
         
         if (session?.user?.id) {
           await fetchProfile(session.user.id);
+          await fetchSubscriptionStatus(session.user.id);
         } else {
           setProfile(null);
+          setIsPremium(false);
         }
       } catch (error) {
         console.error("AuthContext: Error handling auth state change:", error);
@@ -198,7 +241,7 @@ export const AuthProvider = ({ children }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchProfile, fetchSubscriptionStatus]);
 
   // Update the signUp function to better handle the auth state:
 
@@ -386,6 +429,7 @@ export const AuthProvider = ({ children }) => {
     updatePassword,
     refetchProfile,
     clearUserData,
+    isPremium,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

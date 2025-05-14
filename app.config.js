@@ -7,6 +7,8 @@ export default {
     icon: "./assets/images/icon.jpg",
     userInterfaceStyle: "light",
     scheme: "betteru",
+    jsEngine: "hermes",
+    newArchEnabled: false,
     splash: {
       image: "./assets/images/splash-icon.jpg",
       resizeMode: "contain",
@@ -19,17 +21,18 @@ export default {
       supportsTablet: true,
       bundleIdentifier: "com.enriqueortiz.betteru",
       buildNumber: "7",
-      deploymentTarget: "16.0",
-      useFrameworks: "static",
-      buildConfiguration: "Release",
-      otherCplusplusFlags: "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1",
       infoPlist: {
         NSCameraUsageDescription: "This app uses the camera to let you take profile pictures.",
         NSPhotoLibraryUsageDescription: "This app uses the photo library to let you select profile pictures.",
         NSPhotoLibraryAddUsageDescription: "This app uses the photo library to save workout progress images.",
         ITSAppUsesNonExemptEncryption: false,
         UIBackgroundModes: ["remote-notification"],
-        CFBundleAllowMixedLocalizations: true
+        CFBundleAllowMixedLocalizations: true,
+        SKAdNetworkItems: [
+          {
+            SKAdNetworkIdentifier: "cstr6suwn9.skadnetwork"
+          }
+        ]
       }
     },
     android: {
@@ -42,21 +45,16 @@ export default {
     },
     plugins: [
       "expo-router",
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "deploymentTarget": "16.0",
-            "useFrameworks": "static",
-            "buildConfiguration": "Release",
-            "otherCplusplusFlags": "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1",
-            "clangCxxLanguageStandard": "c++17",
-            "clangCxxLibrary": "libc++"
-          }
-        }
-      ],
       "expo-image-picker",
-      "expo-splash-screen"
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.jpg",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
     ],
     experiments: {
       tsconfigPaths: true

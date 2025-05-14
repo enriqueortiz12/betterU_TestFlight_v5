@@ -7,6 +7,7 @@ import { LogoImage } from '../utils/imageUtils';
 import * as RNIap from 'react-native-iap';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import 'react-native-url-polyfill/auto';
 
 function PurchaseSubscriptionScreen() {
   const router = useRouter();
@@ -14,14 +15,89 @@ function PurchaseSubscriptionScreen() {
   const [selectedPlan, setSelectedPlan] = useState('yearly');
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
+  const [iapReady, setIapReady] = useState(false);
+  const [initError, setInitError] = useState(null);
 
   useEffect(() => {
-    loadProducts();
-    setupPurchaseListener();
-    return () => {
-      RNIap.clearTransactionListener();
+    let purchaseListener;
+    let iapInitialized = false;
+
+    const initializeIAP = async () => {
+      try {
+        if (!iapInitialized) {
+          await RNIap.initConnection();
+          iapInitialized = true;
+          setIapReady(true);
+          setInitError(null);
+        }
+        await loadProducts();
+      } catch (error) {
+        console.error('Error initializing IAP:', error);
+        setInitError(error.message);
+        Alert.alert('Error', 'Failed to initialize store. Please try again later.');
+      }
     };
-  }, []);
+
+    const setupPurchaseListener = () => {
+      purchaseListener = RNIap.setTransactionListener(({ responseCode, results, errorCode }) => {
+        if (responseCode === RNIap.IAPResponseCode.OK) {
+          results.forEach(async (purchase) => {
+            if (!purchase.acknowledged) {
+              try {
+                // Call Supabase Edge Function
+                const { data, error } = await supabase.functions.invoke('validate-receipt', {
+                  body: {
+                    user_id: user.id,
+                    receipt_data: purchase.transactionReceipt,
+                    product_id: purchase.productId
+                  }
+                });
+
+                if (error) throw error;
+
+                // Acknowledge the purchase
+                await RNIap.finishTransaction(purchase);
+                
+                Alert.alert('Success', 'Subscription activated successfully!');
+                router.replace('/settings');
+              } catch (error) {
+                console.error('Error validating receipt:', error);
+                Alert.alert('Error', 'Failed to validate purchase');
+              }
+            }
+          });
+        }
+      });
+    };
+
+    // Initialize IAP with retry
+    const initWithRetry = async (retries = 3) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          await initializeIAP();
+          break;
+        } catch (error) {
+          if (i === retries - 1) {
+            console.error('Failed to initialize IAP after retries:', error);
+            setInitError(error.message);
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+        }
+      }
+    };
+
+    initWithRetry();
+    setupPurchaseListener();
+
+    return () => {
+      if (purchaseListener) {
+        purchaseListener.remove();
+      }
+      if (iapInitialized) {
+        RNIap.endConnection();
+      }
+    };
+  }, [user]);
 
   const loadProducts = async () => {
     try {
@@ -39,43 +115,12 @@ function PurchaseSubscriptionScreen() {
     }
   };
 
-  const setupPurchaseListener = () => {
-    const subscription = RNIap.setTransactionListener(({ responseCode, results, errorCode }) => {
-      if (responseCode === RNIap.IAPResponseCode.OK) {
-        results.forEach(async (purchase) => {
-          if (!purchase.acknowledged) {
-            try {
-              // Call Supabase Edge Function
-              const { data, error } = await supabase.functions.invoke('validate-receipt', {
-                body: {
-                  user_id: user.id,
-                  receipt_data: purchase.transactionReceipt,
-                  product_id: purchase.productId
-                }
-              });
-
-              if (error) throw error;
-
-              // Acknowledge the purchase
-              await RNIap.finishTransaction(purchase);
-              
-              Alert.alert('Success', 'Subscription activated successfully!');
-              router.replace('/settings');
-            } catch (error) {
-              console.error('Error validating receipt:', error);
-              Alert.alert('Error', 'Failed to validate purchase');
-            }
-          }
-        });
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  };
-
   const handlePurchase = async () => {
+    if (!iapReady) {
+      Alert.alert('Error', 'Store is not ready yet. Please try again in a moment.');
+      return;
+    }
+
     try {
       setLoading(true);
       const productId = selectedPlan === 'yearly' ? 'goonsquad29' : 'goonsquad28';

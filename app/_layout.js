@@ -33,7 +33,7 @@ export default function RootLayout() {
       } catch (error) {
         console.error('Error initializing app:', error);
         // Still set ready to true to prevent infinite loading
-        setIsReady(true);
+      setIsReady(true);
       }
     };
 
@@ -43,27 +43,27 @@ export default function RootLayout() {
   if (!isReady) {
     return (
       <SafeAreaProvider>
-        <View style={styles.container}>
-          <ActivityIndicator size="large" color="#00ffff" />
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#00ffff" />
           <Text style={styles.loadingText}>{loadingStep}</Text>
-        </View>
+      </View>
       </SafeAreaProvider>
     );
   }
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <AuthProvider>
-          <UserProvider>
-            <UnitsProvider>
-              <TrackingProvider>
-                <Slot />
-              </TrackingProvider>
-            </UnitsProvider>
-          </UserProvider>
-        </AuthProvider>
-      </NavigationContainer>
+    <NavigationContainer>
+      <AuthProvider>
+        <UserProvider>
+          <UnitsProvider>
+            <TrackingProvider>
+              <Slot />
+            </TrackingProvider>
+          </UnitsProvider>
+        </UserProvider>
+      </AuthProvider>
+    </NavigationContainer>
     </SafeAreaProvider>
   );
 }

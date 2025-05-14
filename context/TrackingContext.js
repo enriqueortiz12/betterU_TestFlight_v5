@@ -44,7 +44,7 @@ export const TrackingProvider = ({ children }) => {
         }
 
         // Initialize or load user stats from Supabase
-        if (user) {
+          if (user) {
           // Get stats from user_stats table
           const { data: statsData } = await supabase
             .from('user_stats')
@@ -70,7 +70,7 @@ export const TrackingProvider = ({ children }) => {
           } else {
             // Initialize stats with default values
             const initialStats = {
-              user_id: user.id,
+                user_id: user.id,
               workouts: 0,
               minutes: 0,
               mental_sessions: 0,
@@ -78,7 +78,7 @@ export const TrackingProvider = ({ children }) => {
               streak: profileData?.streak || 0,
               today_workout_completed: false,
               today_mental_completed: false,
-              updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString()
             };
 
             const { error } = await supabase

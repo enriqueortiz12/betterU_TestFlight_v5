@@ -1,16 +1,129 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, Linking, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Alert, Linking, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LogoImage } from '../utils/imageUtils';
+import * as RNIap from 'react-native-iap';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
 function PurchaseSubscriptionScreen() {
   const router = useRouter();
-  const [selectedPlan, setSelectedPlan] = useState('yearly'); // Default to yearly
+  const { user } = useAuth();
+  const [selectedPlan, setSelectedPlan] = useState('yearly');
+  const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState([]);
 
-  const handleUnavailable = () => {
-    Alert.alert('Unavailable', 'In-app purchases are only available in the production app.');
+  useEffect(() => {
+    loadProducts();
+    setupPurchaseListener();
+    return () => {
+      RNIap.clearTransactionListener();
+    };
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      const { responseCode, results } = await RNIap.getProducts([
+        'goonsquad28', // Monthly
+        'goonsquad29'  // Yearly
+      ]);
+      
+      if (responseCode === RNIap.IAPResponseCode.OK) {
+        setProducts(results);
+      }
+    } catch (error) {
+      console.error('Error loading products:', error);
+      Alert.alert('Error', 'Failed to load products');
+    }
+  };
+
+  const setupPurchaseListener = () => {
+    const subscription = RNIap.setTransactionListener(({ responseCode, results, errorCode }) => {
+      if (responseCode === RNIap.IAPResponseCode.OK) {
+        results.forEach(async (purchase) => {
+          if (!purchase.acknowledged) {
+            try {
+              // Call Supabase Edge Function
+              const { data, error } = await supabase.functions.invoke('validate-receipt', {
+                body: {
+                  user_id: user.id,
+                  receipt_data: purchase.transactionReceipt,
+                  product_id: purchase.productId
+                }
+              });
+
+              if (error) throw error;
+
+              // Acknowledge the purchase
+              await RNIap.finishTransaction(purchase);
+              
+              Alert.alert('Success', 'Subscription activated successfully!');
+              router.replace('/settings');
+            } catch (error) {
+              console.error('Error validating receipt:', error);
+              Alert.alert('Error', 'Failed to validate purchase');
+            }
+          }
+        });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  };
+
+  const handlePurchase = async () => {
+    try {
+      setLoading(true);
+      const productId = selectedPlan === 'yearly' ? 'goonsquad29' : 'goonsquad28';
+      await RNIap.buyProduct(productId);
+    } catch (error) {
+      console.error('Error making purchase:', error);
+      Alert.alert('Error', 'Failed to complete purchase');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    try {
+      setLoading(true);
+      const { responseCode, results } = await RNIap.getPurchaseHistory();
+      
+      if (responseCode === RNIap.IAPResponseCode.OK) {
+        if (results.length === 0) {
+          Alert.alert('No Purchases', 'No previous purchases found.');
+          return;
+        }
+
+        // Check each purchase
+        for (const purchase of results) {
+          const { data, error } = await supabase.functions.invoke('validate-receipt', {
+            body: {
+              user_id: user.id,
+              receipt_data: purchase.transactionReceipt,
+              product_id: purchase.productId
+            }
+          });
+
+          if (!error) {
+            Alert.alert('Success', 'Purchases restored successfully!');
+            router.replace('/settings');
+            return;
+          }
+        }
+        
+        Alert.alert('No Valid Purchases', 'No valid purchases found to restore.');
+      }
+    } catch (error) {
+      console.error('Error restoring purchases:', error);
+      Alert.alert('Error', 'Failed to restore purchases');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const plans = [
@@ -79,7 +192,6 @@ function PurchaseSubscriptionScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Back Button */}
       <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/settings')}>
         <Ionicons name="chevron-back" size={28} color="#00ffff" />
         <Text style={styles.backButtonText}>Back to Settings</Text>
@@ -97,19 +209,28 @@ function PurchaseSubscriptionScreen() {
 
       <TouchableOpacity
         style={styles.subscribeButton}
-        onPress={handleUnavailable}
+        onPress={handlePurchase}
+        disabled={loading}
       >
         <LinearGradient
           colors={['#00ffff', '#0088ff']}
           style={styles.subscribeButtonGradient}
         >
-          <Text style={styles.subscribeButtonText}>
-            Subscribe {selectedPlan === 'yearly' ? 'Yearly' : 'Monthly'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <Text style={styles.subscribeButtonText}>
+              Subscribe {selectedPlan === 'yearly' ? 'Yearly' : 'Monthly'}
+            </Text>
+          )}
         </LinearGradient>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.restoreButton} onPress={handleUnavailable}>
+      <TouchableOpacity 
+        style={styles.restoreButton} 
+        onPress={handleRestorePurchases}
+        disabled={loading}
+      >
         <Text style={styles.restoreButtonText}>Restore Purchases</Text>
       </TouchableOpacity>
 

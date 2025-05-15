@@ -1,8 +1,8 @@
 export default {
   expo: {
     name: "BetterU",
-    slug: "betterU_TestFlight_v5",
-    version: "1.0.0",
+    slug: "betterutestflightv8",
+    version: "1.0.1",
     orientation: "portrait",
     icon: "./assets/images/icon.jpg",
     userInterfaceStyle: "light",
@@ -20,7 +20,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.enriqueortiz.betteru",
-      buildNumber: "7",
+      buildNumber: "23",
       infoPlist: {
         NSCameraUsageDescription: "This app uses the camera to let you take profile pictures.",
         NSPhotoLibraryUsageDescription: "This app uses the photo library to let you select profile pictures.",
@@ -61,16 +61,16 @@ export default {
     },
     extra: {
       eas: {
-        projectId: "66752963-da67-4c91-a146-db94dab08773"
+        projectId: "57d27416-420d-4d92-8d6d-d1365c22f311"
       },
       openaiApiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY
     },
-    owner: "enrique_ortiz22",
+    owner: "easbetteru",
     runtimeVersion: {
       policy: "appVersion"
     },
     updates: {
-      url: "https://u.expo.dev/66752963-da67-4c91-a146-db94dab08773"
+      url: "https://u.expo.dev/57d27416-420d-4d92-8d6d-d1365c22f311"
     }
   }
 }; 

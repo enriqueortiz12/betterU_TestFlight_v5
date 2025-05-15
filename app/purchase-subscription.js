@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, Linking, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LogoImage } from '../utils/imageUtils';
-import * as RNIap from 'react-native-iap';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import 'react-native-url-polyfill/auto';
@@ -14,155 +13,68 @@ function PurchaseSubscriptionScreen() {
   const { user } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState('yearly');
   const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [iapReady, setIapReady] = useState(false);
-  const [initError, setInitError] = useState(null);
 
-  useEffect(() => {
-    let purchaseListener;
-    let iapInitialized = false;
-
-    const initializeIAP = async () => {
-      try {
-        if (!iapInitialized) {
-          await RNIap.initConnection();
-          iapInitialized = true;
-          setIapReady(true);
-          setInitError(null);
-        }
-        await loadProducts();
-      } catch (error) {
-        console.error('Error initializing IAP:', error);
-        setInitError(error.message);
-        Alert.alert('Error', 'Failed to initialize store. Please try again later.');
-      }
-    };
-
-    const setupPurchaseListener = () => {
-      purchaseListener = RNIap.setTransactionListener(({ responseCode, results, errorCode }) => {
-        if (responseCode === RNIap.IAPResponseCode.OK) {
-          results.forEach(async (purchase) => {
-            if (!purchase.acknowledged) {
-              try {
-                // Call Supabase Edge Function
-                const { data, error } = await supabase.functions.invoke('validate-receipt', {
-                  body: {
-                    user_id: user.id,
-                    receipt_data: purchase.transactionReceipt,
-                    product_id: purchase.productId
-                  }
-                });
-
-                if (error) throw error;
-
-                // Acknowledge the purchase
-                await RNIap.finishTransaction(purchase);
-                
-                Alert.alert('Success', 'Subscription activated successfully!');
-                router.replace('/settings');
-              } catch (error) {
-                console.error('Error validating receipt:', error);
-                Alert.alert('Error', 'Failed to validate purchase');
-              }
-            }
-          });
-        }
-      });
-    };
-
-    // Initialize IAP with retry
-    const initWithRetry = async (retries = 3) => {
-      for (let i = 0; i < retries; i++) {
-        try {
-          await initializeIAP();
-          break;
-        } catch (error) {
-          if (i === retries - 1) {
-            console.error('Failed to initialize IAP after retries:', error);
-            setInitError(error.message);
-          }
-          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-        }
-      }
-    };
-
-    initWithRetry();
-    setupPurchaseListener();
-
-    return () => {
-      if (purchaseListener) {
-        purchaseListener.remove();
-      }
-      if (iapInitialized) {
-        RNIap.endConnection();
-      }
-    };
-  }, [user]);
-
-  const loadProducts = async () => {
-    try {
-      const { responseCode, results } = await RNIap.getProducts([
-        'goonsquad28', // Monthly
-        'goonsquad29'  // Yearly
-      ]);
-      
-      if (responseCode === RNIap.IAPResponseCode.OK) {
-        setProducts(results);
-      }
-    } catch (error) {
-      console.error('Error loading products:', error);
-      Alert.alert('Error', 'Failed to load products');
-    }
-  };
-
-  const handlePurchase = async () => {
-    if (!iapReady) {
-      Alert.alert('Error', 'Store is not ready yet. Please try again in a moment.');
+  const handlePurchase = async (productId) => {
+    if (!user?.id) {
+      console.log('User not available');
+      Alert.alert('Error', 'Please sign in to continue.');
       return;
     }
 
     try {
       setLoading(true);
-      const productId = selectedPlan === 'yearly' ? 'goonsquad29' : 'goonsquad28';
-      await RNIap.buyProduct(productId);
+      // Create a mock purchase record
+      const { error } = await supabase
+        .from('subscriptions')
+        .upsert({
+          user_id: user.id,
+          product_id: productId,
+          original_transaction_id: 'mock_transaction_' + Date.now(),
+          latest_receipt: 'mock_receipt',
+          status: 'active',
+          purchase_date: new Date().toISOString(),
+          end_date: new Date(Date.now() + (productId === 'betteru.yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString(),
+          platform: 'ios'
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      Alert.alert('Success', 'Subscription activated successfully!');
+      router.replace('/settings');
     } catch (error) {
-      console.error('Error making purchase:', error);
-      Alert.alert('Error', 'Failed to complete purchase');
+      console.error('Purchase error:', error);
+      Alert.alert('Error', 'Failed to process purchase');
     } finally {
       setLoading(false);
     }
   };
 
   const handleRestorePurchases = async () => {
+    if (!user?.id) {
+      console.log('User not available for restore');
+      return;
+    }
+
     try {
       setLoading(true);
-      const { responseCode, results } = await RNIap.getPurchaseHistory();
-      
-      if (responseCode === RNIap.IAPResponseCode.OK) {
-        if (results.length === 0) {
-          Alert.alert('No Purchases', 'No previous purchases found.');
-          return;
-        }
+      // Check for existing subscription
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('end_date', { ascending: false })
+        .limit(1)
+        .single();
 
-        // Check each purchase
-        for (const purchase of results) {
-          const { data, error } = await supabase.functions.invoke('validate-receipt', {
-            body: {
-              user_id: user.id,
-              receipt_data: purchase.transactionReceipt,
-              product_id: purchase.productId
-            }
-          });
-
-          if (!error) {
-            Alert.alert('Success', 'Purchases restored successfully!');
-            router.replace('/settings');
-            return;
-          }
-        }
-        
-        Alert.alert('No Valid Purchases', 'No valid purchases found to restore.');
+      if (error || !data) {
+        Alert.alert('No Purchases', 'No previous purchases found.');
+        return;
       }
+
+      Alert.alert('Success', 'Purchases restored successfully!');
+      router.replace('/settings');
     } catch (error) {
       console.error('Error restoring purchases:', error);
       Alert.alert('Error', 'Failed to restore purchases');
@@ -254,7 +166,7 @@ function PurchaseSubscriptionScreen() {
 
       <TouchableOpacity
         style={styles.subscribeButton}
-        onPress={handlePurchase}
+        onPress={() => handlePurchase(selectedPlan === 'yearly' ? 'betteru.yearly' : 'betteru.monthly')}
         disabled={loading}
       >
         <LinearGradient

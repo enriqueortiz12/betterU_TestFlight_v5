@@ -30,9 +30,9 @@ const WorkoutScreen = () => {
         .from('workout_logs')
         .select('*')
         .eq('user_id', user.id)
-        .gte('date', startOfMonth)
-        .lte('date', endOfMonth)
-        .order('date', { ascending: false });
+        .gte('completed_at', startOfMonth)
+        .lte('completed_at', endOfMonth)
+        .order('completed_at', { ascending: false });
 
       if (error) throw error;
       setWorkoutLogs(data || []);
@@ -102,8 +102,8 @@ const WorkoutScreen = () => {
   const renderWorkoutLog = ({ item }) => (
     <View style={styles.logCard}>
       <View style={styles.logHeader}>
-        <Text style={styles.logTitle}>{item.training_style}</Text>
-        <Text style={styles.logDate}>{formatDate(item.date)}</Text>
+        <Text style={styles.logTitle}>{item.workout_name}</Text>
+        <Text style={styles.logDate}>{formatDate(item.completed_at)}</Text>
       </View>
       <View style={styles.logStats}>
         <View style={styles.logStat}>

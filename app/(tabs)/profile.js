@@ -160,7 +160,7 @@ const ProfileScreen = () => {
   };
 
   const handleSettingsPress = () => {
-    router.push('/settings');
+    router.push('/(tabs)/settings');
   };
 
   const settingsOptions = [

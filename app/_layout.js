@@ -1,5 +1,4 @@
 import { Slot } from 'expo-router';
-import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider } from '../context/AuthContext';
 import { UserProvider } from '../context/UserContext';
 import { UnitsProvider } from '../context/UnitsContext';
@@ -12,50 +11,98 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   const [loadingStep, setLoadingStep] = useState('Initializing...');
+  const [error, setError] = useState(null);
+  const [contextsReady, setContextsReady] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId;
+
     const initializeApp = async () => {
       try {
         // Initial delay to ensure basic setup
+        if (!isMounted) return;
         setLoadingStep('Starting up...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => {
+          timeoutId = setTimeout(resolve, 1000);
+        });
         
-        // Preload images
+        // Preload images with timeout
+        if (!isMounted) return;
         setLoadingStep('Loading assets...');
-        await preloadImages();
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const imageLoadPromise = preloadImages();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Image loading timeout')), 10000)
+        );
+        await Promise.race([imageLoadPromise, timeoutPromise]);
         
         // Give more time for contexts to initialize
+        if (!isMounted) return;
         setLoadingStep('Preparing data...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
         
-        setIsReady(true);
+        // Set a maximum wait time for contexts
+        const maxWaitTime = 5000; // 5 seconds
+        const startTime = Date.now();
+        
+        // Wait for contexts to be ready with a timeout
+        await new Promise((resolve) => {
+          const checkContexts = () => {
+            if (contextsReady || Date.now() - startTime > maxWaitTime) {
+              resolve();
+            } else {
+              timeoutId = setTimeout(checkContexts, 500);
+            }
+          };
+          checkContexts();
+        });
+        
+        if (isMounted) {
+          setIsReady(true);
+          setError(null);
+        }
       } catch (error) {
         console.error('Error initializing app:', error);
-        // Still set ready to true to prevent infinite loading
-      setIsReady(true);
+        if (isMounted) {
+          setError(error.message);
+          // Still set ready to true to prevent infinite loading
+          setIsReady(true);
+        }
       }
     };
 
     initializeApp();
-  }, []);
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [contextsReady]);
 
   if (!isReady) {
     return (
       <SafeAreaProvider>
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#00ffff" />
+        <View style={styles.container}>
+          <ActivityIndicator size="large" color="#00ffff" />
           <Text style={styles.loadingText}>{loadingStep}</Text>
-      </View>
+          {error && (
+            <Text style={styles.errorText}>
+              {error}
+            </Text>
+          )}
+        </View>
       </SafeAreaProvider>
     );
   }
 
   return (
     <SafeAreaProvider>
-    <NavigationContainer>
       <AuthProvider>
-        <UserProvider>
+        <UserProvider onReady={() => {
+          console.log('UserProvider ready callback called');
+          setContextsReady(true);
+        }}>
           <UnitsProvider>
             <TrackingProvider>
               <Slot />
@@ -63,7 +110,6 @@ export default function RootLayout() {
           </UnitsProvider>
         </UserProvider>
       </AuthProvider>
-    </NavigationContainer>
     </SafeAreaProvider>
   );
 }
@@ -79,5 +125,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: '#666'
+  },
+  errorText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#ff4444',
+    textAlign: 'center',
+    paddingHorizontal: 20
   }
 }); 

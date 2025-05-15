@@ -16,6 +16,7 @@ export default function WorkoutSummaryScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Workout Complete! 💪</Text>
+        <Text style={styles.workoutName}>{params.workoutName}</Text>
       </View>
 
       <View style={styles.summaryCard}>
@@ -76,6 +77,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  workoutName: {
+    fontSize: 20,
+    color: '#00ffff',
     textAlign: 'center',
   },
   summaryCard: {

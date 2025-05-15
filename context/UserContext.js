@@ -7,7 +7,7 @@ import { supabase } from "../lib/supabase"
 // Create user context
 const UserContext = createContext({})
 
-export const UserProvider = ({ children }) => {
+export const UserProvider = ({ children, onReady }) => {
   const [userProfile, setUserProfile] = useState({
     name: "",
     age: "",
@@ -21,46 +21,60 @@ export const UserProvider = ({ children }) => {
 
   const [personalRecords, setPersonalRecords] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [initializationError, setInitializationError] = useState(null)
 
   // Sync profile from Supabase to context and AsyncStorage
   const syncProfileFromSupabase = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('No user found during profile sync');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
         .single();
+
       if (error) {
         console.error('Error fetching profile from Supabase:', error);
         return;
       }
+
       if (data) {
-        console.log("Profile data from Supabase:", data); // Debug log
+        console.log("Profile data from Supabase:", data);
         setUserProfile(data);
         await AsyncStorage.setItem('userProfile', JSON.stringify(data));
       }
     } catch (err) {
       console.error('Error in syncProfileFromSupabase:', err);
+      setInitializationError(err);
     }
   };
 
   // Load user data from storage and then sync from Supabase
   useEffect(() => {
+    let isMounted = true;
+    let retryTimeout;
+
     const loadUserData = async () => {
       try {
         setIsLoading(true);
+        setInitializationError(null);
+
         // Load profile from AsyncStorage
         const profileData = await AsyncStorage.getItem('userProfile');
         if (profileData) {
           try {
             const parsedProfile = JSON.parse(profileData);
-            console.log("Profile data from AsyncStorage:", parsedProfile); // Debug log
-            setUserProfile(parsedProfile);
+            console.log("Profile data from AsyncStorage:", parsedProfile);
+            if (isMounted) {
+              setUserProfile(parsedProfile);
+            }
           } catch (parseError) {
             console.error('Error parsing profile data:', parseError);
-            // If parsing fails, clear the corrupted data
             await AsyncStorage.removeItem('userProfile');
           }
         }
@@ -68,7 +82,7 @@ export const UserProvider = ({ children }) => {
         // Load PRs from Supabase with retry logic
         let retryCount = 0;
         const maxRetries = 3;
-        while (retryCount < maxRetries) {
+        while (retryCount < maxRetries && isMounted) {
           try {
             await loadPersonalRecordsFromSupabase();
             break;
@@ -76,16 +90,20 @@ export const UserProvider = ({ children }) => {
             console.error(`Error loading PRs (attempt ${retryCount + 1}/${maxRetries}):`, error);
             retryCount++;
             if (retryCount === maxRetries) {
-              setPersonalRecords([]);
+              if (isMounted) {
+                setPersonalRecords([]);
+              }
             } else {
-              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+              await new Promise(resolve => {
+                retryTimeout = setTimeout(resolve, 1000 * retryCount);
+              });
             }
           }
         }
 
         // Sync profile from Supabase with retry logic
         retryCount = 0;
-        while (retryCount < maxRetries) {
+        while (retryCount < maxRetries && isMounted) {
           try {
             await syncProfileFromSupabase();
             break;
@@ -93,23 +111,39 @@ export const UserProvider = ({ children }) => {
             console.error(`Error syncing profile (attempt ${retryCount + 1}/${maxRetries}):`, error);
             retryCount++;
             if (retryCount === maxRetries) {
-              // Keep existing profile data if sync fails
               console.log('Keeping existing profile data after failed sync');
             } else {
-              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+              await new Promise(resolve => {
+                retryTimeout = setTimeout(resolve, 1000 * retryCount);
+              });
             }
           }
         }
+
+        if (isMounted) {
+          setIsLoading(false);
+          onReady?.();
+        }
       } catch (error) {
         console.error('Error loading user data:', error);
-        setPersonalRecords([]);
-      } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setInitializationError(error);
+          setPersonalRecords([]);
+          setIsLoading(false);
+          onReady?.();
+        }
       }
     };
 
     loadUserData();
-  }, []);
+
+    return () => {
+      isMounted = false;
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+    };
+  }, [onReady]);
 
   // Update the loadPersonalRecordsFromSupabase function to properly handle RLS
   const loadPersonalRecordsFromSupabase = async () => {

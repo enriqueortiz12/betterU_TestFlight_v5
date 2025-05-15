@@ -22,17 +22,13 @@ const MentalSessionSummary = () => {
     try {
       // First save the session
       const { data, error } = await supabase
-        .from('mental_session_logs')
+        .from('mental_sessions')
         .insert([
           {
             user_id: user.id,
             session_type: sessionType,
-            type: sessionType,
             duration: parseInt(duration),
-            calmness_level: calmnessLevel,
-            notes: notes,
-            completed_at: new Date().toISOString(),
-            created_at: new Date().toISOString()
+            completed_at: new Date().toISOString()
           },
         ]);
 

@@ -2,17 +2,16 @@
   "expo": {
     "name": "betterU",
     "slug": "betterU_TestFlight_v7",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/betterUmobile.PNG",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "jsEngine": "jsc",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.enriqueortiz.betteru",
-      "buildNumber": "1",
+      "buildNumber": "24",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to let you take profile pictures.",
         "NSPhotoLibraryUsageDescription": "This app uses the photo library to let you select profile pictures.",
@@ -22,7 +21,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/betterUmobile.PNG",
         "backgroundColor": "#ffffff"
       },
       "package": "com.enriqueortiz.betteru",
@@ -34,7 +33,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/betterUmobile.PNG"
     },
     "plugins": [
       "expo-router",
@@ -42,7 +41,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/betterUmobile.PNG",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
@@ -56,8 +55,11 @@
     "extra": {
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "57d27416-420d-4d92-8d6d-d1365c22f311"
       }
     },
-    "owner": "enrique_ortiz22"
+    "owner": "easbetteru"
   }
 }

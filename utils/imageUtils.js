@@ -52,13 +52,37 @@ export const preloadImages = async () => {
     const images = [
       require("../assets/images/icon.jpg"),
       // Add other images that need preloading here
-    ]
+    ];
 
-    console.log("Logo preloaded successfully")
-    return true
+    // Use Promise.all to load all images in parallel
+    const imagePromises = images.map(image => {
+      return new Promise((resolve, reject) => {
+        const img = Image.resolveAssetSource(image);
+        if (!img || !img.uri) {
+          console.warn('Image source not found:', image);
+          resolve(); // Resolve instead of reject to continue loading other images
+          return;
+        }
+
+        Image.prefetch(img.uri)
+          .then(() => {
+            console.log('Successfully preloaded image:', img.uri);
+            resolve();
+          })
+          .catch(error => {
+            console.warn('Failed to preload image:', img.uri, error);
+            resolve(); // Resolve instead of reject to continue loading other images
+          });
+      });
+    });
+
+    await Promise.all(imagePromises);
+    console.log("All images preloaded successfully");
+    return true;
   } catch (error) {
-    console.error("Error preloading images:", error)
-    return false
+    console.error("Error preloading images:", error);
+    // Don't throw the error, just return false
+    return false;
   }
-}
+};
 

@@ -214,64 +214,81 @@ const ActiveMentalSession = () => {
 
   // Save session to Supabase
   const handleSessionComplete = async () => {
+    if (!user) {
+      console.error('No user found');
+      return;
+    }
+
     try {
-      if (!user) return;
-      setIsActive(false);
       const { error } = await supabase
         .from('mental_session_logs')
         .insert({
           user_id: user.id,
-          session_type: session.id,
-          type: session.type,
+          session_name: session.title,
+          session_type: session.type,
           duration: session.duration,
-          completed_at: new Date().toISOString(),
+          completed_at: new Date().toISOString()
         });
+
       if (error) throw error;
+
+      // Update session state
+      setIsActive(false);
       await incrementStat('mental_sessions');
+
+      // Show success message
       Alert.alert(
-        'Session Complete',
-        'Great job completing your mental wellness session!',
+        'Session Completed',
+        'Your mental session has been saved successfully!',
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (error) {
-      console.error('Error saving session:', error);
-      Alert.alert('Error', 'Failed to save session');
+      console.error('Error saving mental session:', error);
+      Alert.alert(
+        'Error',
+        'Failed to save your mental session. Please try again.'
+      );
     }
   };
 
   // Save and go to summary
   const handleFinishSession = async () => {
-    try {
-      if (!user) return;
-      setIsActive(false);
+    if (!user) {
+      console.error('No user found');
+      return;
+    }
 
-      // Save session to Supabase
+    try {
       const { error } = await supabase
         .from('mental_session_logs')
         .insert({
           user_id: user.id,
-          session_type: session.id,
-          type: session.type,
+          session_name: session.title,
+          session_type: session.type,
           duration: session.duration,
-          completed_at: new Date().toISOString(),
+          completed_at: new Date().toISOString()
         });
 
       if (error) throw error;
 
-      // Update stats
+      // Update session state
+      setIsActive(false);
       await incrementStat('mental_sessions');
 
       // Navigate to summary
       router.push({
         pathname: '/mental-session-summary',
         params: {
-          sessionType: session.type,
+          sessionType: session.type || 'meditation',
           duration: session.duration,
         },
       });
     } catch (error) {
-      console.error('Error saving session:', error);
-      Alert.alert('Error', 'Failed to save session');
+      console.error('Error saving mental session:', error);
+      Alert.alert(
+        'Error',
+        'Failed to save your mental session. Please try again.'
+      );
     }
   };
 

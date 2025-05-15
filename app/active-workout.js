@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useTracking } from '../context/TrackingContext';
+import { useAuth } from '../context/AuthContext';
 
 const workoutData = {
   'Full Body Workout': {
@@ -1523,6 +1524,7 @@ const workoutData = {
 
 const ActiveWorkoutScreen = () => {
   const router = useRouter();
+  const { user } = useAuth();
   const params = useLocalSearchParams();
   const { updateStats, stats, incrementStat } = useTracking();
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -1641,60 +1643,73 @@ const ActiveWorkoutScreen = () => {
   };
 
   const saveWorkoutLog = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user logged in');
-
-      // Calculate total completed sets and exercise count
-      let completedSets = 0;
-      let totalWeight = 0;
-      const exerciseNames = [];
-
-      workout.exercises.forEach(exercise => {
-        exerciseNames.push(exercise.name);
-        exercise.sets.forEach(set => {
-          if (set.completed) {
-            completedSets++;
-            if (set.weight) {
-              // Extract the number of reps from the rep range (e.g., "8-12" -> 8)
-              const reps = parseInt(set.reps.split('-')[0]) || 0;
-              const weight = parseFloat(set.weight) || 0;
-              totalWeight += weight * reps;
-            }
-          }
-        });
-      });
-
-      const workoutLog = {
-        user_id: user.id,
-        training_style: workout.name,
-        date: new Date().toISOString(),
-        duration: elapsedTime.toString(),
-        exercise_count: workout.exercises.length,
-        set_count: workout.exercises.reduce((total, ex) => total + ex.sets.length, 0),
-        completed_sets: completedSets,
-        total_weight: Math.round(totalWeight),
-        exercise_names: exerciseNames,
-        notes: '',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      const { error } = await supabase
-        .from('workout_logs')
-        .insert([workoutLog]);
-
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
-      return true;
-    } catch (error) {
-      console.error('Error saving workout log:', error);
-      Alert.alert('Error', 'Failed to save workout log. Your workout will still be reset.');
-      return false;
+    if (!user) {
+        console.error('No user found');
+        return;
     }
-  };
+
+    try {
+        // Calculate completed sets and total weight
+        let completedSets = 0;
+        let totalWeight = 0;
+        let exerciseNames = [];
+        let exerciseCount = 0;
+
+        // Process each exercise
+        const exerciseData = workout.exercises.map(exercise => {
+            exerciseCount++;
+            exerciseNames.push(exercise.name);
+            
+            const sets = exercise.sets.map(set => {
+                if (set.completed) {
+                    completedSets++;
+                    totalWeight += (set.weight || 0) * (set.reps || 0);
+                }
+                return {
+                    weight: set.weight || 0,
+                    reps: set.reps || 0,
+                    completed: set.completed || false
+                };
+            });
+
+            return {
+                name: exercise.name,
+                targetMuscles: exercise.targetMuscles || [],
+                sets: sets
+            };
+        });
+
+        // Save to Supabase
+        const { error } = await supabase
+            .from('workout_logs')
+            .insert({
+                user_id: user.id,
+                workout_name: workout.name,
+                exercises: exerciseData,
+                completed_sets: completedSets,
+                exercise_count: exerciseCount,
+                exercise_names: exerciseNames,
+                total_weight: totalWeight,
+                duration: workout.duration || 0,
+                completed_at: new Date().toISOString()
+            });
+
+        if (error) throw error;
+
+        // Show success message
+        Alert.alert(
+            'Workout Completed',
+            'Your workout has been saved successfully!',
+            [{ text: 'OK', onPress: () => router.back() }]
+        );
+    } catch (error) {
+        console.error('Error saving workout:', error);
+        Alert.alert(
+            'Error',
+            'Failed to save your workout. Please try again.'
+        );
+    }
+};
 
   const handleFinish = async () => {
     setShowFinishConfirmation(true);
@@ -1702,55 +1717,78 @@ const ActiveWorkoutScreen = () => {
 
   const confirmFinish = async () => {
     try {
-      // Calculate stats
-      let completedSets = 0;
-      let totalWeight = 0;
-      workout.exercises.forEach(exercise => {
-        exercise.sets.forEach(set => {
-          if (set.completed) {
-            completedSets++;
-            if (set.weight) {
-              const reps = parseInt(set.reps.split('-')[0]) || 0;
-              const weight = parseFloat(set.weight) || 0;
-              totalWeight += weight * reps;
-            }
-          }
+        // Calculate stats
+        let completedSets = 0;
+        let totalWeight = 0;
+        workout.exercises.forEach(exercise => {
+            exercise.sets.forEach(set => {
+                if (set.completed) {
+                    completedSets++;
+                    if (set.weight) {
+                        const reps = parseInt(set.reps.split('-')[0]) || 0;
+                        const weight = parseFloat(set.weight) || 0;
+                        totalWeight += weight * reps;
+                    }
+                }
+            });
         });
-      });
 
-      // Save to Supabase
-      const saved = await saveWorkoutLog();
-      if (!saved) {
-        Alert.alert('Error', 'Failed to save workout log');
-        return;
-      }
+        // Save to Supabase
+        const { error } = await supabase
+            .from('workout_logs')
+            .insert({
+                user_id: user.id,
+                workout_name: workout.name,
+                exercises: workout.exercises.map(exercise => ({
+                    name: exercise.name,
+                    targetMuscles: exercise.targetMuscles || [],
+                    sets: exercise.sets.map(set => ({
+                        weight: set.weight || 0,
+                        reps: set.reps || 0,
+                        completed: set.completed || false
+                    }))
+                })),
+                completed_sets: completedSets,
+                exercise_count: workout.exercises.length,
+                exercise_names: workout.exercises.map(ex => ex.name),
+                total_weight: Math.round(totalWeight),
+                duration: elapsedTime,
+                completed_at: new Date().toISOString()
+            });
+
+        if (error) {
+            console.error('Error saving workout:', error);
+            Alert.alert('Error', 'Failed to save workout log');
+            return;
+        }
 
         // Update tracking stats
         const minutesWorked = Math.floor(elapsedTime / 60);
-      await incrementStat('workouts', 1);
-      await incrementStat('minutes', minutesWorked);
+        await incrementStat('workouts', 1);
+        await incrementStat('minutes', minutesWorked);
 
-      // Reset workout and hide confirmation
-      resetWorkout();
-      setShowFinishConfirmation(false);
+        // Reset workout and hide confirmation
+        resetWorkout();
+        setShowFinishConfirmation(false);
 
-      // Navigate to summary with stats
-      router.push({
-        pathname: '/(tabs)/workout-summary',
-        params: {
-          duration: elapsedTime,
-          exerciseCount: workout.exercises.length,
-          completedSets,
-          totalWeight: Math.round(totalWeight),
-          justCompleted: true
-        }
-      });
+        // Navigate to summary with stats
+        router.push({
+            pathname: '/(tabs)/workout-summary',
+            params: {
+                duration: elapsedTime,
+                exerciseCount: workout.exercises.length,
+                completedSets,
+                totalWeight: Math.round(totalWeight),
+                workoutName: workout.name,
+                justCompleted: true
+            }
+        });
     } catch (error) {
-      console.error('Error finishing workout:', error);
-      Alert.alert('Error', 'Failed to complete workout');
-      setShowFinishConfirmation(false);
+        console.error('Error finishing workout:', error);
+        Alert.alert('Error', 'Failed to complete workout');
+        setShowFinishConfirmation(false);
     }
-  };
+};
 
   const handleExit = () => {
     setShowExitConfirmation(true);

@@ -200,25 +200,6 @@ const HomeScreen = () => {
   }, [calories.consumed, water.consumed]);
 
   useEffect(() => {
-    const checkStreakIncrement = () => {
-      const now = new Date();
-      const midnight = new Date(now);
-      midnight.setHours(24, 0, 0, 0);
-      const timeUntilMidnight = midnight - now;
-
-      if (timeUntilMidnight <= 0) {
-        // Increment streak at midnight if conditions are met
-        if (stats.workouts > 0 || stats.mental_sessions > 0) {
-          incrementStat('streak', 1);
-        }
-      }
-    };
-
-    const intervalId = setInterval(checkStreakIncrement, 60000); // Check every minute
-    return () => clearInterval(intervalId);
-  }, [stats.workouts, stats.mental_sessions]);
-
-  useEffect(() => {
     setWorkoutCompleted(stats.today_workout_completed);
     setMentalCompleted(stats.today_mental_completed);
   }, [stats.today_workout_completed, stats.today_mental_completed]);
@@ -320,64 +301,81 @@ const HomeScreen = () => {
 
   // Update the updateStreak function to use profiles table
   const updateStreak = async () => {
-    if (!profile?.id) {
-      Alert.alert('Error', 'Please wait for your profile to load');
-      return;
-    }
+    if (!profile || !profile.id) return;
 
-    if (streakUpdatedToday) {
-      Alert.alert('Already Updated', 'You have already updated your streak today.');
-      return;
-    }
-    if (workoutCompleted && mentalCompleted) {
-      const today = new Date().toISOString().split('T')[0];
-      console.log('Updating streak for user:', profile.id);
-      
-      // Get current streak from profiles
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('streak, longest_streak')
-        .eq('id', profile.id)
+    try {
+      // Get today's date in UTC
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      const todayStr = today.toISOString();
+
+      // Check if streak was already updated today
+      const { data: streakData } = await supabase
+        .from('betteru_streaks')
+        .select('last_completed_date')
+        .eq('user_id', profile.id)
         .single();
 
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-        Alert.alert('Error', 'Failed to update streak. Please try again.');
-        return;
+      if (streakData?.last_completed_date) {
+        const lastUpdate = new Date(streakData.last_completed_date);
+        lastUpdate.setUTCHours(0, 0, 0, 0);
+        
+        // If streak was already updated today, don't update again
+        if (lastUpdate.getTime() === today.getTime()) {
+          return;
+        }
       }
 
-      // Calculate new streak values
-      const currentStreak = (profileData?.streak || 0) + 1;
-      const longestStreak = Math.max(currentStreak, profileData?.longest_streak || 0);
+      // Get today's workout and mental session logs
+      const { data: workoutLogs } = await supabase
+        .from('workout_logs')
+        .select('completed_at')
+        .eq('user_id', profile.id)
+        .gte('completed_at', todayStr)
+        .lt('completed_at', new Date(today.getTime() + 86400000).toISOString());
 
-      // Update streak in profiles table
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          streak: currentStreak,
-          longest_streak: longestStreak,
-          last_streak_update: today
-        })
-        .eq('id', profile.id);
+      const { data: mentalLogs } = await supabase
+        .from('mental_session_logs')
+        .select('completed_at')
+        .eq('user_id', profile.id)
+        .gte('completed_at', todayStr)
+        .lt('completed_at', new Date(today.getTime() + 86400000).toISOString());
 
-      if (updateError) {
-        console.error('Error updating streak:', updateError);
-        Alert.alert('Error', 'Failed to update streak. Please try again.');
-        return;
+      const hasWorkout = workoutLogs && workoutLogs.length > 0;
+      const hasMental = mentalLogs && mentalLogs.length > 0;
+
+      if (hasWorkout && hasMental) {
+        // Get current streak data
+        const { data: currentStreak } = await supabase
+          .from('betteru_streaks')
+          .select('current_streak, longest_streak')
+          .eq('user_id', profile.id)
+          .single();
+
+        const newStreak = (currentStreak?.current_streak || 0) + 1;
+        const newLongestStreak = Math.max(newStreak, currentStreak?.longest_streak || 0);
+
+        // Update streak
+        const { error } = await supabase
+          .from('betteru_streaks')
+          .upsert({
+            user_id: profile.id,
+            current_streak: newStreak,
+            longest_streak: newLongestStreak,
+            last_completed_date: todayStr,
+            updated_at: new Date().toISOString()
+          });
+
+        if (error) throw error;
+
+        // Update local state
+        incrementStat('streak', 1);
+        setStreakUpdatedToday(true);
+        setWorkoutCompleted(false);
+        setMentalCompleted(false);
       }
-
-      // Update local state
-      incrementStat('streak', 1);
-      setStreakUpdatedToday(true);
-      setWorkoutCompleted(false);
-      setMentalCompleted(false);
-      Alert.alert('Success', 'Your streak has been updated!');
-    } else if (!workoutCompleted && !mentalCompleted) {
-      Alert.alert('Incomplete', 'You need both a workout and a mental session to update your streak.');
-    } else if (!workoutCompleted) {
-      Alert.alert('Incomplete', 'You need a workout to update your streak.');
-    } else if (!mentalCompleted) {
-      Alert.alert('Incomplete', 'You need a mental session to update your streak.');
+    } catch (error) {
+      console.error('Error updating streak:', error);
     }
   };
 

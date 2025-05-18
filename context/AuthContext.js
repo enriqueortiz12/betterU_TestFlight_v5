@@ -11,85 +11,46 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null)
   const [session, setSession] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isPremium, setIsPremium] = useState(false)
+
+  // PROFILE FETCH REMOVED: Commented out all profile fetching and logging
+  /*
+  // All code that fetches or logs profile data is now commented out.
+  */
 
   // Update the fetchProfile function to properly handle RLS
   const fetchProfile = useCallback(async (userId) => {
     try {
-      console.log("AuthContext: Starting profile fetch for user:", userId)
+      console.log("[AuthContext] Fetching profile with userId:", userId);
 
       if (!userId) {
-        console.error("AuthContext: No user ID provided to fetchProfile")
-        setProfile(null)
-        setIsLoading(false)
-        return
-      }
-
-      // First check if the profiles table exists
-      const { data: tableExists, error: tableCheckError } = await supabase
-        .from('profiles')
-        .select('id')
-        .limit(1);
-
-      if (tableCheckError) {
-        console.error("AuthContext: Error checking profiles table:", tableCheckError);
+        console.error("[AuthContext] No user ID provided to fetchProfile");
         setProfile(null);
         setIsLoading(false);
         return;
       }
 
-      // Make sure we're using the authenticated client for this request
-      const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).single()
+      // Fetch using user_id to match profile screen
+      const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
+      console.log("[AuthContext] Profile fetch result:", data, error);
 
       if (error) {
-        console.error("AuthContext: Error fetching profile:", error)
-
-        if (error.code === "PGRST116") {
-          console.log("AuthContext: No profile found, creating one")
-
-          // Get user email
-          const { data: userData } = await supabase.auth.getUser()
-          const email = userData?.user?.email
-
-          // Create a simple profile
-          const initialProfile = {
-            user_id: userId,
-            full_name: email ? email.split("@")[0] : "New User",
-            email: email,
-            training_level: "intermediate",
-          }
-
-          const { data: newProfile, error: createError } = await supabase
-            .from("profiles")
-            .insert([initialProfile])
-            .select()
-
-          if (createError) {
-            console.error("AuthContext: Failed to create profile:", createError)
-            setProfile(initialProfile) // Use local data as fallback
-          } else {
-            console.log("AuthContext: Created new profile:", newProfile)
-            setProfile(newProfile[0])
-          }
-        } else {
-          // For other errors, use a fallback profile
-          setProfile(null)
-        }
+        console.error("[AuthContext] Error fetching profile:", error);
+        setProfile(null);
       } else {
-        console.log("AuthContext: Profile data fetched successfully:", data)
-        setProfile(data)
+        setProfile(data);
       }
     } catch (error) {
-      console.error("AuthContext: Exception in fetchProfile:", error)
-      setProfile(null)
+      console.error("[AuthContext] Exception in fetchProfile:", error);
+      setProfile(null);
     } finally {
-      console.log("AuthContext: Finished profile fetch")
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [])
+  }, []);
 
   // Add a function to create an initial profile
   const createInitialProfile = async (userId) => {
+    // PROFILE FETCH REMOVED: Commented out all profile fetching and logging
+    /*
     try {
       if (!userId) return
 
@@ -97,7 +58,7 @@ export const AuthProvider = ({ children }) => {
       const email = user?.data?.user?.email
 
       const initialProfile = {
-        user_id: userId,
+        profile_id: userId,
         full_name: email ? email.split("@")[0] : "New User",
         email: email,
         training_level: "intermediate",
@@ -114,46 +75,10 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error("AuthContext: Error in createInitialProfile:", error)
     }
+    */
   }
 
-  // Fetch subscription status from Supabase
-  const fetchSubscriptionStatus = useCallback(async (userId) => {
-    try {
-      if (!userId) {
-        console.log('fetchSubscriptionStatus: No userId provided');
-        setIsPremium(false);
-        return;
-      }
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', userId)
-        .order('end_date', { ascending: false })
-        .limit(1)
-        .single();
-      if (error) {
-        console.error('fetchSubscriptionStatus: Error fetching subscription:', error);
-        setIsPremium(false);
-        return;
-      }
-      console.log('fetchSubscriptionStatus: Fetched subscription row:', data);
-      let isPremium = false;
-      if (data) {
-        const now = new Date();
-        const endDate = data.end_date ? new Date(data.end_date) : null;
-        isPremium =
-          data.status === 'active' &&
-          (!endDate || endDate > now);
-      }
-      console.log('fetchSubscriptionStatus: Computed isPremium =', isPremium, 'from status =', data?.status, 'end_date =', data?.end_date);
-      setIsPremium(isPremium);
-    } catch (error) {
-      console.error('fetchSubscriptionStatus: Exception:', error);
-      setIsPremium(false);
-    }
-  }, []);
-
-  // Update the auth state change handler to be more robust
+  // Update the auth state change handler
   useEffect(() => {
     console.log("AuthContext: Setting up auth state listeners")
 
@@ -174,7 +99,6 @@ export const AuthProvider = ({ children }) => {
               setUser(session?.user ?? null);
               if (session?.user?.id) {
                 await fetchProfile(session.user.id);
-                await fetchSubscriptionStatus(session.user.id);
               }
             }
             break;
@@ -185,7 +109,6 @@ export const AuthProvider = ({ children }) => {
               if (mounted) {
                 setSession(null);
                 setUser(null);
-                setIsPremium(false);
               }
             } else {
               await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
@@ -197,7 +120,6 @@ export const AuthProvider = ({ children }) => {
         if (mounted) {
           setSession(null);
           setUser(null);
-          setIsPremium(false);
         }
       } finally {
         if (mounted) {
@@ -222,10 +144,8 @@ export const AuthProvider = ({ children }) => {
         
         if (session?.user?.id) {
           await fetchProfile(session.user.id);
-          await fetchSubscriptionStatus(session.user.id);
         } else {
           setProfile(null);
-          setIsPremium(false);
         }
       } catch (error) {
         console.error("AuthContext: Error handling auth state change:", error);
@@ -241,7 +161,7 @@ export const AuthProvider = ({ children }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchProfile, fetchSubscriptionStatus]);
+  }, [fetchProfile]);
 
   // Update the signUp function to better handle the auth state:
 
@@ -400,7 +320,7 @@ export const AuthProvider = ({ children }) => {
       const { error } = await supabase
         .from('onboarding_data')
         .delete()
-        .eq('user_id', session?.user?.id);
+        .eq('profile_id', session?.user?.id);
 
       if (error) throw error;
 
@@ -429,7 +349,6 @@ export const AuthProvider = ({ children }) => {
     updatePassword,
     refetchProfile,
     clearUserData,
-    isPremium,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

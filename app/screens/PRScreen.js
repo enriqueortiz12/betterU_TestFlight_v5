@@ -68,13 +68,13 @@ const PRScreen = () => {
       const { data, error } = await supabase
         .from('personal_records')
         .select('*')
-        .eq('user_id', userId);
+        .eq('profile_id', userId);
       
       if (error) throw error;
 
       const convertedData = data?.map(pr => ({
         id: pr.id,
-        exercise: pr.exercise_name,
+        exercise: pr.exercise,
         current_value: parseFloat(pr.weight_current),
         target_value: parseFloat(pr.weight_target),
         unit: getWeightUnit(),
@@ -113,8 +113,8 @@ const PRScreen = () => {
       const { data, error } = await supabase
         .from('personal_records')
         .insert([{
-          user_id: userId,
-          exercise_name: newPR.exercise,
+          profile_id: userId,
+          exercise: newPR.exercise,
           weight_current: currentValueInKg,
           weight_target: targetValueInKg,
           weight_unit: 'kg',
@@ -225,7 +225,7 @@ const PRScreen = () => {
       const { error } = await supabase
         .from('personal_records')
         .update({
-          exercise_name: newPR.exercise,
+          exercise: newPR.exercise,
           weight_current: currentValueInKg,
           weight_target: targetValueInKg,
           weight_unit: 'kg',

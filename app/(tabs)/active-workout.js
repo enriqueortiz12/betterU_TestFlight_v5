@@ -3,9 +3,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../lib/supabase';
-import { useTracking } from '../context/TrackingContext';
-import { useAuth } from '../context/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { useTracking } from '../../context/TrackingContext';
+import { useAuth } from '../../context/AuthContext';
+import { useUser } from '../../context/UserContext';
+import { AppState } from 'react-native';
 
 const workoutData = {
   'Full Body Workout': {
@@ -1000,19 +1002,22 @@ const workoutData = {
     exercises: [
       {
         name: 'Burpees',
-        targetMuscles: 'Full Body',
+        targetMuscles: 'Glutes, Quads, Hamstrings, Core, Calves, Chest, Shoulders, Triceps',
         instructions: [
-          'Start standing, drop to plank',
-          'Perform push-up',
-          'Jump feet to hands',
-          'Explosive jump with arms overhead'
+          "Stand with your feet shoulder-width apart, arms at your sides.",
+          "Drop into a squat position and place your hands on the floor in front of you.",
+          "Jump your feet back so you're in a high plank position.",
+          "Do a push-up, keeping your body straight and core tight.",
+          "Jump your feet forward to return to the squat position.",
+          "Explosively jump into the air, reaching your arms overhead.",
+          "Land softly and immediately go into the next rep."
         ],
         sets: [
           { weight: '', reps: '30s', completed: false },
           { weight: '', reps: '30s', completed: false },
           { weight: '', reps: '30s', completed: false },
-          { weight: '', reps: '30s', completed: false },
-        ],
+          { weight: '', reps: '30s', completed: false }
+        ]
       },
       {
         name: 'Mountain Climbers',
@@ -1134,18 +1139,47 @@ const workoutData = {
     exercises: [
       {
         name: 'Dynamic Stretching',
-        targetMuscles: 'Full Body',
+        targetMuscles: 'Hips, Hamstrings, Quads, Glutes, Shoulders, Core',
         instructions: [
-          'Start with light cardio (jogging, jumping jacks) for 5 minutes',
-          'Perform controlled movements through full range of motion',
-          'Focus on major muscle groups: legs, hips, shoulders, and back',
-          'Hold each stretch for 2-3 seconds, repeat 8-10 times per movement',
-          'Keep movements smooth and controlled, avoid bouncing'
+          "Perform a series of active movements to warm up the body before exercise.",
+          "Examples: Arm circles (shoulders), leg swings (hips, hamstrings), walking lunges (quads, glutes), high knees (hip flexors, core), butt kicks (hamstrings, quads), trunk twists (core), and side shuffles (adductors, abductors).",
+          "Each movement should be performed for 20-30 seconds, moving through a full range of motion without holding the stretch."
         ],
         sets: [
           { weight: '', reps: '60s', completed: false },
-          { weight: '', reps: '60s', completed: false },
+          { weight: '', reps: '60s', completed: false }
+        ]
+      },
+      {
+        name: 'Yoga Poses',
+        targetMuscles: 'Back, Hips, Hamstrings, Shoulders, Core',
+        instructions: [
+          "Perform a sequence of foundational yoga poses, holding each for 30-60 seconds:",
+          "1. Downward Facing Dog: Start on hands and knees, lift hips to form an inverted V. Stretches hamstrings, calves, shoulders, and back.",
+          "2. Cat-Cow: Alternate arching and rounding your back on hands and knees. Mobilizes spine and stretches back/core.",
+          "3. Cobra Pose: Lie on your stomach, hands under shoulders, press up to lift chest. Stretches chest, abs, and strengthens back.",
+          "4. Child's Pose: Kneel, sit back on heels, stretch arms forward. Stretches back, hips, and relaxes the body.",
+          "5. Warrior I: Lunge forward with one leg, arms overhead, hips square. Stretches hips, strengthens legs and shoulders."
         ],
+        sets: [
+          { weight: '', reps: '30s each', completed: false },
+          { weight: '', reps: '30s each', completed: false }
+        ]
+      },
+      {
+        name: 'Joint Mobility',
+        targetMuscles: 'Ankles, Hips, Shoulders',
+        instructions: [
+          "Start with gentle circular movements",
+          "Move through full range of motion",
+          "Focus on controlled, smooth movements",
+          "Perform 8-10 reps in each direction",
+          "Stop if you feel any sharp pain"
+        ],
+        sets: [
+          { weight: '', reps: '30s each', completed: false },
+          { weight: '', reps: '30s each', completed: false }
+        ]
       },
       {
         name: 'Foam Rolling',
@@ -1160,36 +1194,6 @@ const workoutData = {
         sets: [
           { weight: '', reps: '60s per area', completed: false },
           { weight: '', reps: '60s per area', completed: false },
-        ],
-      },
-      {
-        name: 'Yoga Poses',
-        targetMuscles: 'Full Body',
-        instructions: [
-          'Start with basic poses: downward dog, child\'s pose, cat-cow',
-          'Focus on proper breathing and alignment',
-          'Hold each pose for 30-60 seconds',
-          'Move mindfully between poses',
-          'Listen to your body and modify as needed'
-        ],
-        sets: [
-          { weight: '', reps: '30s each', completed: false },
-          { weight: '', reps: '30s each', completed: false },
-        ],
-      },
-      {
-        name: 'Joint Mobility',
-        targetMuscles: 'Ankles, Hips, Shoulders',
-        instructions: [
-          'Start with gentle circular movements',
-          'Move through full range of motion',
-          'Focus on controlled, smooth movements',
-          'Perform 8-10 reps in each direction',
-          'Stop if you feel any sharp pain'
-        ],
-        sets: [
-          { weight: '', reps: '30s each', completed: false },
-          { weight: '', reps: '30s each', completed: false },
         ],
       },
     ],
@@ -1520,6 +1524,338 @@ const workoutData = {
       }
     ]
   },
+  'power-clean': {
+    name: 'Power Clean',
+    targetMuscles: 'Full Body, Back, Shoulders, Legs',
+    instructions: [
+      'Stand with feet hip-width apart, barbell over mid-foot',
+      'Grip bar just outside legs, back flat, chest up',
+      'Pull bar explosively from floor, extending hips and knees',
+      'Shrug shoulders and pull bar up, dropping under to catch on shoulders',
+      'Stand up fully with bar on shoulders'
+    ]
+  },
+  'push-press': {
+    name: 'Push Press',
+    targetMuscles: 'Shoulders, Triceps, Legs',
+    instructions: [
+      'Stand with barbell at shoulder height, feet shoulder-width apart',
+      'Dip knees slightly, then drive up explosively',
+      'Press bar overhead to full extension',
+      'Lower bar back to shoulders with control'
+    ]
+  },
+  'box-jump': {
+    name: 'Box Jump',
+    targetMuscles: 'Legs, Glutes, Core',
+    instructions: [
+      'Stand in front of box with feet shoulder-width apart',
+      'Bend knees and swing arms back',
+      'Explosively jump onto box, landing softly',
+      'Stand up fully, then step down carefully'
+    ]
+  },
+  'chin-up': {
+    name: 'Chin-Up',
+    targetMuscles: 'Back, Biceps',
+    instructions: [
+      'Grip bar with palms facing you, hands shoulder-width apart',
+      'Hang with arms fully extended',
+      'Pull chin above bar, squeezing back and biceps',
+      'Lower with control to starting position'
+    ]
+  },
+  'farmer\'s-walk': {
+    name: "Farmer's Walk",
+    targetMuscles: 'Grip, Shoulders, Core, Legs',
+    instructions: [
+      'Hold heavy dumbbells or kettlebells at sides',
+      'Stand tall, shoulders back, core tight',
+      'Walk forward for distance or time',
+      'Keep posture upright throughout'
+    ]
+  },
+  'cable-kickback': {
+    name: 'Cable Kickback',
+    targetMuscles: 'Glutes, Hamstrings',
+    instructions: [
+      'Attach ankle strap to low cable',
+      'Stand facing machine, hold support',
+      'Kick leg back, squeezing glute',
+      'Return with control, repeat for reps'
+    ]
+  },
+  'plank-variation': {
+    name: 'Plank Variation',
+    targetMuscles: 'Core, Shoulders',
+    instructions: [
+      'Assume plank position (forearm, side, or extended)',
+      'Keep body in straight line',
+      'Engage core and glutes',
+      'Hold for desired time or switch variations'
+    ]
+  },
+  'hanging-leg-raise': {
+    name: 'Hanging Leg Raise',
+    targetMuscles: 'Abs, Hip Flexors',
+    instructions: [
+      'Hang from pull-up bar, arms extended',
+      'Keep legs straight, raise them to hip height or higher',
+      'Lower with control',
+      'Avoid swinging'
+    ]
+  },
+  'battle-rope': {
+    name: 'Battle Ropes',
+    targetMuscles: 'Shoulders, Arms, Core',
+    instructions: [
+      'Hold rope ends with both hands',
+      'Stand with knees slightly bent',
+      'Move arms explosively to create waves',
+      'Alternate or use both arms together'
+    ]
+  },
+  'sled-push': {
+    name: 'Sled Push',
+    targetMuscles: 'Legs, Glutes, Core',
+    instructions: [
+      'Stand behind sled, hands on handles',
+      'Lean forward, drive through legs to push sled',
+      'Keep core tight and back flat',
+      'Push for distance or time'
+    ]
+  },
+  'burpee-pull-up': {
+    name: 'Burpee Pull-Up',
+    targetMuscles: 'Full Body, Back, Arms',
+    instructions: [
+      'Perform a burpee under a pull-up bar',
+      'After jumping up, grab bar and do a pull-up',
+      'Lower down, return to burpee position',
+      'Repeat for reps'
+    ]
+  },
+  'rowing-sprint': {
+    name: 'Rowing Sprint',
+    targetMuscles: 'Back, Legs, Cardio',
+    instructions: [
+      'Sit on rowing machine, feet strapped in',
+      'Grip handle, drive with legs then pull with arms',
+      'Row as fast as possible for set time or distance',
+      'Maintain good form throughout'
+    ]
+  },
+  'medicine-ball-slam': {
+    name: 'Medicine Ball Slam',
+    targetMuscles: 'Shoulders, Core, Arms',
+    instructions: [
+      'Stand holding medicine ball overhead',
+      'Slam ball down to floor with force',
+      'Squat to pick up and repeat'
+    ]
+  },
+  'incline-barbell-press': {
+    name: 'Incline Barbell Press',
+    targetMuscles: 'Upper Chest, Shoulders, Triceps',
+    instructions: [
+      'Set bench to 30-45 degrees',
+      'Grip bar slightly wider than shoulders',
+      'Lower bar to upper chest',
+      'Press bar up to starting position'
+    ]
+  },
+  'pendlay-row': {
+    name: 'Pendlay Row',
+    targetMuscles: 'Back, Lats, Rear Delts',
+    instructions: [
+      'Stand with feet hip-width, barbell on floor',
+      'Grip bar overhand, back parallel to ground',
+      'Pull bar explosively to lower chest',
+      'Lower bar to floor each rep'
+    ]
+  },
+  'walking-lunge': {
+    name: 'Walking Lunge',
+    targetMuscles: 'Quads, Glutes, Hamstrings',
+    instructions: [
+      'Stand tall, step forward into lunge',
+      'Lower until both knees are bent at 90 degrees',
+      'Push through front heel, bring back foot forward',
+      'Alternate legs as you walk'
+    ]
+  },
+  'arnold-press': {
+    name: 'Arnold Press',
+    targetMuscles: 'Shoulders, Triceps',
+    instructions: [
+      'Sit or stand holding dumbbells at shoulder height, palms facing you',
+      'Rotate palms outward as you press weights overhead',
+      'Lower with control, rotating palms back in'
+    ]
+  },
+  'nordic-hamstring-curl': {
+    name: 'Nordic Hamstring Curl',
+    targetMuscles: 'Hamstrings, Glutes',
+    instructions: [
+      'Kneel with ankles secured',
+      'Lower torso forward slowly, keeping hips extended',
+      'Catch yourself with hands if needed, pull back up with hamstrings'
+    ]
+  },
+  'plank-jack': {
+    name: 'Plank Jack',
+    targetMuscles: 'Core, Shoulders, Legs',
+    instructions: [
+      'Start in plank position',
+      'Jump feet out wide, then back together',
+      'Keep core tight and back flat',
+      'Repeat for reps or time'
+    ]
+  },
+  'static-stretching': {
+    name: 'Static Stretching',
+    targetMuscles: 'Full Body',
+    instructions: [
+      'Hold each stretch for 20-60 seconds',
+      'Do not bounce, relax into the stretch',
+      'Breathe deeply and focus on target muscle',
+      'Switch sides as needed'
+    ]
+  },
+  'bicycle-crunch': {
+    name: 'Bicycle Crunch',
+    targetMuscles: 'Abs, Obliques',
+    instructions: [
+      'Lie on back, hands behind head',
+      'Bring knees up, lift shoulders off floor',
+      'Alternate bringing opposite elbow to knee, extending other leg',
+      'Repeat in a pedaling motion'
+    ]
+  },
+  'dip': {
+    name: 'Dip',
+    targetMuscles: 'Chest, Triceps, Shoulders',
+    instructions: [
+      'Grip parallel bars, arms straight',
+      'Lower body until shoulders are below elbows',
+      'Press back up to starting position',
+      'Keep core tight throughout'
+    ]
+  },
+  'dumbbell-press': {
+    name: 'Dumbbell Press',
+    targetMuscles: 'Chest, Shoulders, Triceps',
+    instructions: [
+      'Lie on bench with dumbbells at chest level',
+      'Press weights up until arms are straight',
+      'Lower with control to starting position'
+    ]
+  },
+};
+
+// Add a helper to generate a howTo string from instructions
+function generateHowTo(instructions) {
+  if (!instructions || instructions.length === 0) return '';
+  return instructions.join(' ');
+}
+
+// Add howTo to every exercise in workoutData
+Object.values(workoutData).forEach(workout => {
+  if (Array.isArray(workout.exercises)) {
+    workout.exercises.forEach(ex => {
+      if (!ex.howTo) {
+        ex.howTo = generateHowTo(ex.instructions);
+      }
+    });
+  }
+});
+
+// Helper: get default info for common exercises
+const defaultExerciseInfo = {
+  'push-up': {
+    name: 'Push-Up',
+    targetMuscles: 'Chest, Shoulders, Triceps, Core',
+    instructions: [
+      'Start in a plank position with hands under shoulders',
+      'Lower your body until your chest nearly touches the floor',
+      'Push back up to starting position',
+      'Keep your body straight throughout'
+    ]
+  },
+  'sit-up': {
+    name: 'Sit-Up',
+    targetMuscles: 'Abdominals',
+    instructions: [
+      'Lie on your back with knees bent',
+      'Cross arms over chest or place hands behind head',
+      'Lift your torso toward your knees',
+      'Lower back down with control'
+    ]
+  },
+  'plank': {
+    name: 'Plank',
+    targetMuscles: 'Core, Shoulders',
+    instructions: [
+      'Start in forearm plank position',
+      'Keep body in straight line',
+      'Engage core and glutes',
+      'Hold position for desired time'
+    ]
+  },
+  'jumping jack': {
+    name: 'Jumping Jack',
+    targetMuscles: 'Full Body, Calves, Shoulders, Glutes',
+    instructions: [
+      'Stand upright with feet together and arms at your sides',
+      'Jump feet out to the sides while raising arms overhead',
+      'Jump back to starting position',
+      'Repeat quickly for desired reps or time'
+    ]
+  },
+  'lunge': {
+    name: 'Lunge',
+    targetMuscles: 'Quads, Glutes, Hamstrings',
+    instructions: [
+      'Stand tall with feet hip-width apart',
+      'Step forward with one leg and lower your hips until both knees are bent at about 90 degrees',
+      'Push back to starting position',
+      'Alternate legs for each rep'
+    ]
+  },
+  'crunch': {
+    name: 'Crunch',
+    targetMuscles: 'Abdominals',
+    instructions: [
+      'Lie on your back with knees bent and feet flat on the floor',
+      'Place hands behind your head or across your chest',
+      'Lift your shoulders off the floor, engaging your abs',
+      'Lower back down with control'
+    ]
+  },
+  'mountain climber': {
+    name: 'Mountain Climber',
+    targetMuscles: 'Core, Shoulders, Quads',
+    instructions: [
+      "Start in a high plank position",
+      "Drive one knee toward your chest",
+      "Switch legs quickly, alternating knees to chest",
+      "Keep core tight and back flat throughout"
+    ]
+  },
+  'burpee': {
+    name: 'Burpee',
+    targetMuscles: 'Glutes, Quads, Hamstrings, Core, Calves, Chest, Shoulders, Triceps',
+    instructions: [
+      "Stand with your feet shoulder-width apart, arms at your sides",
+      "Drop into a squat position and place your hands on the floor in front of you",
+      "Jump your feet back so you're in a high plank position",
+      "Do a push-up, keeping your body straight and core tight",
+      "Jump your feet forward to return to the squat position",
+      "Explosively jump into the air, reaching your arms overhead",
+      "Land softly and immediately go into the next rep."
+    ]
+  },
+  // Add more as needed
 };
 
 const ActiveWorkoutScreen = () => {
@@ -1538,6 +1874,7 @@ const ActiveWorkoutScreen = () => {
   const [showFinishConfirmation, setShowFinishConfirmation] = useState(false);
   const [showHowToModal, setShowHowToModal] = useState(false);
   const [currentExercise, setCurrentExercise] = useState(null);
+  const { userProfile } = useUser();
 
   // Initialize workout state based on params
   useEffect(() => {
@@ -1547,24 +1884,52 @@ const ActiveWorkoutScreen = () => {
         setWorkout({
           name: parsed.name,
           exercises: parsed.exercises.map(ex => {
-            let found = null;
-            for (const workout of Object.values(workoutData)) {
-              found = workout.exercises.find(e => e.name === ex.name);
-              if (found) break;
+            // If ex is a string, it's just the exercise name
+            if (typeof ex === 'string') {
+              // Try to find matching exercise in workoutData
+              let found = null;
+              for (const workout of Object.values(workoutData)) {
+                found = workout.exercises.find(e => e.name && e.name.toLowerCase() === ex.toLowerCase());
+                if (found) break;
+              }
+              // If found, use that exercise's data
+              if (found) {
+                return {
+                  ...found,
+                  sets: Array.from({ length: 3 }, () => ({
+                    weight: '',
+                    reps: found.sets[0].reps,
+                    completed: false
+                  }))
+                };
+              }
+              // If not found, use default info or create basic exercise
+              return {
+                name: ex,
+                targetMuscles: 'Full Body',
+                instructions: ['No specific instructions available.'],
+                sets: Array.from({ length: 3 }, () => ({
+                  weight: '',
+                  reps: '8-12',
+                  completed: false
+                }))
+              };
             }
+            // If ex is an object, use its data
             return {
               name: ex.name,
-              targetMuscles: ex.targetMuscles || found?.targetMuscles || '',
-              instructions: ex.instructions || found?.instructions || [],
+              targetMuscles: ex.targetMuscles || 'Full Body',
+              instructions: ex.instructions || ['No specific instructions available.'],
               sets: Array.from({ length: parseInt(ex.sets) || 3 }, () => ({
                 weight: '',
-                reps: ex.reps || found?.sets?.[0]?.reps || '8-12',
+                reps: ex.reps || '8-12',
                 completed: false
-              })),
+              }))
             };
-          }),
+          })
         });
       } catch (e) {
+        console.error('Error parsing workout:', e);
         setWorkout(workoutData['Full Body Workout']);
       }
     } else {
@@ -1572,21 +1937,40 @@ const ActiveWorkoutScreen = () => {
     }
   }, [params.custom, params.workout, params.type]);
 
-  // Load saved rest time
+  // --- Rest Time Preference Sync ---
   useEffect(() => {
+    let isMounted = true;
+    // Function to load rest time from AsyncStorage
     const loadRestTime = async () => {
       try {
-        const savedRestTime = await AsyncStorage.getItem('restTime');
-        if (savedRestTime) {
-          setRestTime(parseInt(savedRestTime));
-          setCurrentRestTime(parseInt(savedRestTime));
+        const savedRestTime = await AsyncStorage.getItem('restTimeSeconds');
+        if (savedRestTime !== null) {
+          const parsedRestTime = parseInt(savedRestTime);
+          if (!isNaN(parsedRestTime) && isMounted) {
+            setRestTime(parsedRestTime);
+            setCurrentRestTime(parsedRestTime);
+          }
         }
       } catch (error) {
-        console.error('Error loading rest time:', error);
+        if (__DEV__) console.error('Error loading rest time:', error);
       }
     };
     loadRestTime();
+    // Listen for app state changes to reload rest time
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        loadRestTime();
+      }
+    });
+    // Poll for changes every 2 seconds (robust sync)
+    const interval = setInterval(loadRestTime, 2000);
+    return () => {
+      isMounted = false;
+      subscription.remove();
+      clearInterval(interval);
+    };
   }, []);
+  // --- End Rest Time Preference Sync ---
 
   // Timer for workout duration
   useEffect(() => {
@@ -1624,7 +2008,7 @@ const ActiveWorkoutScreen = () => {
     const newWorkout = { ...workout };
     newWorkout.exercises[exerciseIndex].sets[setIndex].completed = true;
     setWorkout(newWorkout);
-    
+    // Always use the latest restTime value
     setCurrentRestTime(restTime);
     setShowRestTimer(true);
     setRestTimerActive(true);
@@ -1643,73 +2027,97 @@ const ActiveWorkoutScreen = () => {
   };
 
   const saveWorkoutLog = async () => {
-    if (!user) {
-        console.error('No user found');
-        return;
+    if (!userProfile || !userProfile.profile_id) {
+      console.error('No profile found for user');
+      return;
     }
-
+    const profileId = userProfile.profile_id;
     try {
-        // Calculate completed sets and total weight
-        let completedSets = 0;
-        let totalWeight = 0;
-        let exerciseNames = [];
-        let exerciseCount = 0;
-
-        // Process each exercise
-        const exerciseData = workout.exercises.map(exercise => {
-            exerciseCount++;
-            exerciseNames.push(exercise.name);
-            
-            const sets = exercise.sets.map(set => {
-                if (set.completed) {
-                    completedSets++;
-                    totalWeight += (set.weight || 0) * (set.reps || 0);
-                }
-                return {
-                    weight: set.weight || 0,
-                    reps: set.reps || 0,
-                    completed: set.completed || false
-                };
-            });
-
-            return {
-                name: exercise.name,
-                targetMuscles: exercise.targetMuscles || [],
-                sets: sets
-            };
+      // Calculate completed sets and total weight
+      let completedSets = 0;
+      let totalWeight = 0;
+      let exerciseNames = [];
+      let exerciseCount = 0;
+      // Process each exercise
+      const exerciseData = workout.exercises.map(exercise => {
+        exerciseCount++;
+        exerciseNames.push(exercise.name);
+        const sets = exercise.sets.map(set => {
+          if (set.completed) {
+            completedSets++;
+            totalWeight += (set.weight || 0) * (set.reps || 0);
+          }
+          return {
+            weight: set.weight || 0,
+            reps: set.reps || 0,
+            completed: set.completed || false
+          };
         });
+        return {
+          name: exercise.name,
+          targetMuscles: exercise.targetMuscles || [],
+          sets: sets
+        };
+      });
 
-        // Save to Supabase
+      // First check if a record exists for today
+      const { data: existingLog } = await supabase
+        .from('user_workout_logs')
+        .select('*')
+        .eq('profile_id', profileId)
+        .gte('completed_at', new Date().toISOString().split('T')[0])
+        .single();
+
+      if (existingLog) {
+        // Update existing record
         const { error } = await supabase
-            .from('workout_logs')
-            .insert({
-                user_id: user.id,
-                workout_name: workout.name,
-                exercises: exerciseData,
-                completed_sets: completedSets,
-                exercise_count: exerciseCount,
-                exercise_names: exerciseNames,
-                total_weight: totalWeight,
-                duration: workout.duration || 0,
-                completed_at: new Date().toISOString()
-            });
+          .from('user_workout_logs')
+          .update({
+            workout_name: workout.workout_name || workout.name,
+            exercises: exerciseData,
+            completed_sets: completedSets,
+            exercise_count: exerciseCount,
+            exercise_names: exerciseNames,
+            total_weight: totalWeight,
+            duration: workout.duration || 0,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', existingLog.id);
 
         if (error) throw error;
+      } else {
+        // Insert new record
+        const { error } = await supabase
+          .from('user_workout_logs')
+          .insert({
+            profile_id: profileId,
+            workout_name: workout.workout_name || workout.name,
+            exercises: exerciseData,
+            completed_sets: completedSets,
+            exercise_count: exerciseCount,
+            exercise_names: exerciseNames,
+            total_weight: totalWeight,
+            duration: workout.duration || 0,
+            completed_at: new Date().toISOString()
+          });
 
-        // Show success message
-        Alert.alert(
-            'Workout Completed',
-            'Your workout has been saved successfully!',
-            [{ text: 'OK', onPress: () => router.back() }]
-        );
+        if (error) throw error;
+      }
+
+      // Show success message
+      Alert.alert(
+        'Workout Completed',
+        'Your workout has been saved successfully!',
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
     } catch (error) {
-        console.error('Error saving workout:', error);
-        Alert.alert(
-            'Error',
-            'Failed to save your workout. Please try again.'
-        );
+      console.error('Error saving workout:', error);
+      Alert.alert(
+        'Error',
+        'Failed to save your workout. Please try again.'
+      );
     }
-};
+  };
 
   const handleFinish = async () => {
     setShowFinishConfirmation(true);
@@ -1717,86 +2125,141 @@ const ActiveWorkoutScreen = () => {
 
   const confirmFinish = async () => {
     try {
-        // Calculate stats
-        let completedSets = 0;
-        let totalWeight = 0;
-        workout.exercises.forEach(exercise => {
-            exercise.sets.forEach(set => {
-                if (set.completed) {
-                    completedSets++;
-                    if (set.weight) {
-                        const reps = parseInt(set.reps.split('-')[0]) || 0;
-                        const weight = parseFloat(set.weight) || 0;
-                        totalWeight += weight * reps;
-                    }
-                }
-            });
+      if (!userProfile || !userProfile.profile_id) {
+        console.error('No profile found for user');
+        return;
+      }
+      const profileId = userProfile.profile_id;
+      
+      // Calculate stats
+      let completedSets = 0;
+      let totalWeight = 0;
+      workout.exercises.forEach(exercise => {
+        exercise.sets.forEach(set => {
+          if (set.completed) {
+            completedSets++;
+            if (set.weight) {
+              const reps = parseInt(set.reps.split('-')[0]) || 0;
+              const weight = parseFloat(set.weight) || 0;
+              totalWeight += weight * reps;
+            }
+          }
         });
+      });
 
-        // Save to Supabase
-        const { error } = await supabase
-            .from('workout_logs')
+      // Function to retry database operations
+      const retryOperation = async (operation, maxRetries = 3) => {
+        for (let i = 0; i < maxRetries; i++) {
+          try {
+            return await operation();
+          } catch (error) {
+            if (i === maxRetries - 1) throw error;
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+          }
+        }
+      };
+
+      // Update or create stats with retry
+      await retryOperation(async () => {
+        const { data: existingStats } = await supabase
+          .from('user_stats')
+          .select('*')
+          .eq('profile_id', profileId)
+          .single();
+
+        if (existingStats) {
+          const { error: statsError } = await supabase
+            .from('user_stats')
+            .update({
+              today_workout_completed: true,
+              updated_at: new Date().toISOString()
+            })
+            .eq('profile_id', profileId);
+
+          if (statsError) throw statsError;
+        } else {
+          const { error: statsError } = await supabase
+            .from('user_stats')
             .insert({
-                user_id: user.id,
-                workout_name: workout.name,
-                exercises: workout.exercises.map(exercise => ({
-                    name: exercise.name,
-                    targetMuscles: exercise.targetMuscles || [],
-                    sets: exercise.sets.map(set => ({
-                        weight: set.weight || 0,
-                        reps: set.reps || 0,
-                        completed: set.completed || false
-                    }))
-                })),
-                completed_sets: completedSets,
-                exercise_count: workout.exercises.length,
-                exercise_names: workout.exercises.map(ex => ex.name),
-                total_weight: Math.round(totalWeight),
-                duration: elapsedTime,
-                completed_at: new Date().toISOString()
+              profile_id: profileId,
+              today_workout_completed: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
             });
 
-        if (error) {
-            console.error('Error saving workout:', error);
-            Alert.alert('Error', 'Failed to save workout log');
-            return;
+          if (statsError) throw statsError;
         }
+      });
 
-        // Update tracking stats
-        const minutesWorked = Math.floor(elapsedTime / 60);
+      // Save workout log with retry
+      await retryOperation(async () => {
+        const { error } = await supabase
+          .from('user_workout_logs')
+          .insert({
+            profile_id: profileId,
+            workout_name: workout.workout_name || workout.name,
+            exercises: workout.exercises.map(exercise => ({
+              name: exercise.name,
+              targetMuscles: exercise.targetMuscles || [],
+              sets: exercise.sets.map(set => ({
+                weight: set.weight || 0,
+                reps: set.reps || 0,
+                completed: set.completed || false
+              }))
+            })),
+            completed_sets: completedSets,
+            exercise_count: workout.exercises.length,
+            exercise_names: workout.exercises.map(ex => ex.name),
+            total_weight: Math.round(totalWeight),
+            duration: elapsedTime,
+            completed_at: new Date().toISOString()
+          });
+
+        if (error) throw error;
+      });
+
+      // Update tracking stats with retry
+      const minutesWorked = Math.floor(elapsedTime / 60);
+      await retryOperation(async () => {
         await incrementStat('workouts', 1);
         await incrementStat('minutes', minutesWorked);
+      });
+      
+      // Update local state for workout completion
+      await updateStats(prev => ({
+        ...prev,
+        today_workout_completed: true
+      }));
 
-        // Reset workout and hide confirmation
-        resetWorkout();
-        setShowFinishConfirmation(false);
-
-        // Navigate to summary with stats
-        router.push({
-            pathname: '/(tabs)/workout-summary',
-            params: {
-                duration: elapsedTime,
-                exerciseCount: workout.exercises.length,
-                completedSets,
-                totalWeight: Math.round(totalWeight),
-                workoutName: workout.name,
-                justCompleted: true
-            }
-        });
+      // Reset workout and hide confirmation
+      resetWorkout();
+      setShowFinishConfirmation(false);
+      
+      // Navigate to summary with stats
+      router.push({
+        pathname: '/(tabs)/workout-summary',
+        params: {
+          duration: elapsedTime,
+          exerciseCount: workout.exercises.length,
+          completedSets,
+          totalWeight: Math.round(totalWeight),
+          workoutName: workout.workout_name || workout.name,
+          justCompleted: true
+        }
+      });
     } catch (error) {
-        console.error('Error finishing workout:', error);
-        Alert.alert('Error', 'Failed to complete workout');
-        setShowFinishConfirmation(false);
+      console.error('Error finishing workout:', error);
+      Alert.alert(
+        'Connection Error',
+        'There was a problem saving your workout. Please check your internet connection and try again.',
+        [{ text: 'OK', onPress: () => setShowFinishConfirmation(false) }]
+      );
     }
-};
+  };
 
   const handleExit = () => {
     setShowExitConfirmation(true);
-  };
-
-  const confirmExit = () => {
-    resetWorkout();
-    router.back();
   };
 
   const skipRest = () => {
@@ -1815,8 +2278,21 @@ const ActiveWorkoutScreen = () => {
   };
 
   const handleHowToPress = (exercise) => {
-    setCurrentExercise(exercise);
-    setShowHowToModal(true);
+    // Check if exercise has instructions, if not, try to find it in defaultExerciseInfo
+    const exerciseInfo = exercise.instructions ? exercise : 
+      defaultExerciseInfo[exercise.name.toLowerCase().replace(/\s+/g, '-')];
+    
+    if (exerciseInfo) {
+      setCurrentExercise(exerciseInfo);
+      setShowHowToModal(true);
+    } else {
+      // If no instructions found, show a message
+      Alert.alert(
+        'Instructions Not Available',
+        'Sorry, instructions for this exercise are not available yet.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   // Add loading state at the top of the component
@@ -1862,14 +2338,16 @@ const ActiveWorkoutScreen = () => {
           <View key={exerciseIndex} style={styles.exerciseCard}>
             <View style={styles.exerciseHeader}>
               <View>
-                <Text style={styles.exerciseName}>{exercise.name}</Text>
-                <TouchableOpacity 
+                <Text style={styles.exerciseName}>{exercise.name || 'Exercise'}</Text>
+                <TouchableOpacity
                   style={styles.howToButton}
                   onPress={() => handleHowToPress(exercise)}
                 >
-                  <Text style={styles.howToText}>How-To</Text>
-                  <Text style={styles.targetMuscles}>{exercise.targetMuscles || 'No target muscles info'}</Text>
+                  <Text style={styles.howToButtonText}>How To</Text>
                 </TouchableOpacity>
+                <Text style={styles.targetMuscles}>
+                  Target Muscles: {exercise.targetMuscles || 'N/A'}
+                </Text>
               </View>
             </View>
 
@@ -1967,13 +2445,19 @@ const ActiveWorkoutScreen = () => {
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowExitConfirmation(false)}
+                onPress={() => {
+                  setShowExitConfirmation(false);
+                }}
               >
                 <Text style={styles.cancelButtonText}>Stay</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.confirmButton]}
-                onPress={confirmExit}
+                onPress={() => {
+                  setShowExitConfirmation(false);
+                  resetWorkout();
+                  router.replace('/(tabs)/workout');
+                }}
               >
                 <Text style={styles.confirmButtonText}>Exit</Text>
               </TouchableOpacity>
@@ -2142,7 +2626,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  howToText: {
+  howToButtonText: {
     color: '#00ffff',
     fontSize: 14,
   },

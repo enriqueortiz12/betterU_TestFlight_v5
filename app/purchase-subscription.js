@@ -27,7 +27,7 @@ function PurchaseSubscriptionScreen() {
       const { error } = await supabase
         .from('subscriptions')
         .upsert({
-          user_id: user.id,
+          profile_id: user.id,
           product_id: productId,
           original_transaction_id: 'mock_transaction_' + Date.now(),
           latest_receipt: 'mock_receipt',
@@ -63,7 +63,7 @@ function PurchaseSubscriptionScreen() {
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('profile_id', user.id)
         .order('end_date', { ascending: false })
         .limit(1)
         .single();
@@ -180,6 +180,61 @@ function PurchaseSubscriptionScreen() {
               Subscribe {selectedPlan === 'yearly' ? 'Yearly' : 'Monthly'}
             </Text>
           )}
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* Mock Purchase Button */}
+      <TouchableOpacity
+        style={[styles.mockPurchaseButton, loading && { opacity: 0.7 }]}
+        onPress={async () => {
+          setLoading(true);
+          try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (!authUser?.id) {
+              Alert.alert('Error', 'Please sign in to continue.');
+              setLoading(false);
+              return;
+            }
+            console.log('profile_id for subscription:', authUser.id);
+            const now = new Date();
+            const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+            const { data, error } = await supabase
+              .from('subscriptions')
+              .upsert({
+                user_id: authUser.id,
+                profile_id: authUser.id,
+                product_id: 'mock_premium',
+                original_transaction_id: 'mock_transaction_' + Date.now(),
+                latest_receipt: 'mock_receipt',
+                status: 'active',
+                purchase_date: now.toISOString(),
+                start_date: now.toISOString(),
+                end_date: end.toISOString(),
+                platform: 'mock',
+                created_at: now.toISOString(),
+                updated_at: now.toISOString()
+              })
+              .select();
+            if (error) throw error;
+            console.log('Mock subscription row created:', data);
+            Alert.alert('Success', 'Mock subscription created!');
+            router.replace('/settings');
+          } catch (err) {
+            Alert.alert('Error', err.message || 'Failed to create mock subscription.');
+          } finally {
+            setLoading(false);
+          }
+        }}
+        disabled={loading}
+      >
+        <LinearGradient
+          colors={['#44ff44', '#00ff99']}
+          style={styles.mockPurchaseButtonGradient}
+        >
+          <View style={styles.mockPurchaseButtonContent}>
+            <Ionicons name="checkmark-circle" size={24} color="#fff" style={{ marginRight: 10 }} />
+            <Text style={styles.mockPurchaseButtonText}>Mock Purchase</Text>
+          </View>
         </LinearGradient>
       </TouchableOpacity>
 
@@ -348,6 +403,37 @@ const styles = StyleSheet.create({
     color: '#00ffff',
     fontSize: 14,
     textDecorationLine: 'underline',
+  },
+  mockPurchaseButton: {
+    borderRadius: 12,
+    marginTop: 20,
+    marginBottom: 10,
+    shadowColor: '#44ff44',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 2,
+    borderColor: '#00ff99',
+    overflow: 'hidden',
+  },
+  mockPurchaseButtonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  mockPurchaseButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mockPurchaseButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 18,
+    letterSpacing: 1,
   },
 });
 

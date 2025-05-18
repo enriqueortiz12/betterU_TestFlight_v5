@@ -22,7 +22,7 @@ const MentalSessionLog = () => {
       const { data, error } = await supabase
         .from('mental_session_logs')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('profile_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -112,8 +112,8 @@ const MentalSessionLog = () => {
           sessions.map((session) => (
             <View key={session.id} style={styles.sessionCard}>
               <View style={styles.sessionHeader}>
-                <Text style={styles.sessionType}>
-                  {session.type === 'meditation' ? 'Meditation' : 'Breathing Exercise'}
+                <Text style={styles.session_type}>
+                  {session.session_type === 'meditation' ? 'Meditation' : 'Breathing Exercise'}
                 </Text>
                 <TouchableOpacity
                   onPress={() => handleDelete(session.id)}
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 5,
   },
-  sessionType: {
+  session_type: {
     fontSize: 18,
     fontWeight: '600',
     color: '#fff',

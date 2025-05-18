@@ -20,14 +20,16 @@ const MentalSessionSummary = () => {
 
   const handleSave = async () => {
     try {
-      // First save the session
+      // First save the session to mental_sessions
       const { data, error } = await supabase
         .from('mental_sessions')
         .insert([
           {
-            user_id: user.id,
+            profile_id: user.id,
             session_type: sessionType,
             duration: parseInt(duration),
+            calmness_level: calmnessLevel,
+            notes: notes,
             completed_at: new Date().toISOString()
           },
         ]);
@@ -35,6 +37,24 @@ const MentalSessionSummary = () => {
       if (error) {
         console.error('Error saving session:', error);
         throw error;
+      }
+
+      // Also save to mental_session_logs
+      const { error: logError } = await supabase
+        .from('mental_session_logs')
+        .insert([
+          {
+            profile_id: user.id,
+            session_type: sessionType,
+            duration: parseInt(duration),
+            calmness_level: calmnessLevel,
+            notes: notes,
+            completed_at: new Date().toISOString()
+          },
+        ]);
+      if (logError) {
+        console.error('Error saving session log:', logError);
+        // Don't throw, allow main save to succeed
       }
 
       // Then update stats

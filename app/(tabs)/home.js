@@ -3,11 +3,12 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Animated, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { useTracking } from '../../context/TrackingContext';
+import { useTracking, forceDailyReset } from '../../context/TrackingContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';
 import PremiumFeature from '../components/PremiumFeature';
 import { supabase } from '../../lib/supabase';
+import { useUser } from '../../context/UserContext';
 
 // Add more motivational quotes
 const motivationalQuotes = [
@@ -131,8 +132,8 @@ const motivationalQuotes = [
 
 const HomeScreen = () => {
   const router = useRouter();
-  const { profile, isPremium } = useAuth();
-  const { calories, water, mood, stats, addCalories, addWater, updateGoal, incrementStat } = useTracking();
+  const { userProfile } = useUser();
+  const { calories, water, mood, stats, addCalories, addWater, updateGoal, incrementStat, setCalories, setWater, setStats } = useTracking();
   const [showCalorieModal, setShowCalorieModal] = useState(false);
   const [calorieInput, setCalorieInput] = useState('');
   const [showCustomWaterModal, setShowCustomWaterModal] = useState(false);
@@ -207,17 +208,17 @@ const HomeScreen = () => {
   // Add a useEffect to fetch and sync state on login
   useEffect(() => {
     const fetchStats = async () => {
-      if (!profile?.id) {
+      if (!userProfile?.id) {
         console.log('Profile not loaded yet');
         return;
       }
 
-      console.log('Fetching stats for user:', profile.id);
+      console.log('Fetching stats for user:', userProfile.id);
       // Get stats from profiles table
       let { data, error } = await supabase
         .from('profiles')
         .select('today_workout_completed, today_mental_completed, last_streak_update')
-        .eq('id', profile.id)
+        .eq('profile_id', userProfile.id)
         .single();
 
       if (error) {
@@ -232,18 +233,18 @@ const HomeScreen = () => {
       setStreakUpdatedToday(data.last_streak_update === today);
     };
     fetchStats();
-  }, [profile]);
+  }, [userProfile]);
 
   // Add a useEffect to check for daily reset
   useEffect(() => {
     const checkDailyReset = async () => {
-      if (!profile?.id) return;
+      if (!userProfile?.id) return;
 
       const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('profiles')
         .select('last_streak_update')
-        .eq('id', profile.id)
+        .eq('profile_id', userProfile.id)
         .single();
 
       if (error) {
@@ -262,7 +263,7 @@ const HomeScreen = () => {
     checkDailyReset(); // Initial check
 
     return () => clearInterval(interval);
-  }, [profile]);
+  }, [userProfile]);
 
   const handleAddCalories = () => {
     const amount = parseInt(calorieInput);
@@ -301,7 +302,7 @@ const HomeScreen = () => {
 
   // Update the updateStreak function to use profiles table
   const updateStreak = async () => {
-    if (!profile || !profile.id) return;
+    if (!userProfile || !userProfile.id) return;
 
     try {
       // Get today's date in UTC
@@ -313,7 +314,7 @@ const HomeScreen = () => {
       const { data: streakData } = await supabase
         .from('betteru_streaks')
         .select('last_completed_date')
-        .eq('user_id', profile.id)
+        .eq('profile_id', userProfile.id)
         .single();
 
       if (streakData?.last_completed_date) {
@@ -322,22 +323,22 @@ const HomeScreen = () => {
         
         // If streak was already updated today, don't update again
         if (lastUpdate.getTime() === today.getTime()) {
-          return;
-        }
+        return;
+      }
       }
 
       // Get today's workout and mental session logs
       const { data: workoutLogs } = await supabase
         .from('workout_logs')
         .select('completed_at')
-        .eq('user_id', profile.id)
+        .eq('profile_id', userProfile.id)
         .gte('completed_at', todayStr)
         .lt('completed_at', new Date(today.getTime() + 86400000).toISOString());
 
       const { data: mentalLogs } = await supabase
         .from('mental_session_logs')
         .select('completed_at')
-        .eq('user_id', profile.id)
+        .eq('profile_id', userProfile.id)
         .gte('completed_at', todayStr)
         .lt('completed_at', new Date(today.getTime() + 86400000).toISOString());
 
@@ -349,7 +350,7 @@ const HomeScreen = () => {
         const { data: currentStreak } = await supabase
           .from('betteru_streaks')
           .select('current_streak, longest_streak')
-          .eq('user_id', profile.id)
+          .eq('profile_id', userProfile.id)
           .single();
 
         const newStreak = (currentStreak?.current_streak || 0) + 1;
@@ -359,7 +360,7 @@ const HomeScreen = () => {
         const { error } = await supabase
           .from('betteru_streaks')
           .upsert({
-            user_id: profile.id,
+            profile_id: userProfile.id,
             current_streak: newStreak,
             longest_streak: newLongestStreak,
             last_completed_date: todayStr,
@@ -368,11 +369,11 @@ const HomeScreen = () => {
 
         if (error) throw error;
 
-        // Update local state
-        incrementStat('streak', 1);
-        setStreakUpdatedToday(true);
-        setWorkoutCompleted(false);
-        setMentalCompleted(false);
+      // Update local state
+      incrementStat('streak', 1);
+      setStreakUpdatedToday(true);
+      setWorkoutCompleted(false);
+      setMentalCompleted(false);
       }
     } catch (error) {
       console.error('Error updating streak:', error);
@@ -380,11 +381,11 @@ const HomeScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: 80 }]}>
       <View style={styles.header}>
         <View style={styles.greeting}>
           <Text style={styles.greetingText}>Good Afternoon</Text>
-          <Text style={styles.nameText}>{profile?.full_name || 'User'}</Text>
+          <Text style={styles.nameText}>{userProfile?.full_name || 'User'}</Text>
         </View>
       </View>
 
@@ -402,16 +403,6 @@ const HomeScreen = () => {
             <Text style={styles.streakValue}>{stats.streak || 0} days</Text>
           </View>
         </View>
-        {!streakUpdatedToday && (
-          <TouchableOpacity 
-            style={styles.updateStreakButton}
-            onPress={updateStreak}
-          >
-            <Text style={styles.updateStreakButtonText}>
-              Update Streak
-            </Text>
-          </TouchableOpacity>
-        )}
         <View style={styles.activityStatus}>
           <View style={styles.activityItem}>
             <Ionicons 
@@ -435,9 +426,7 @@ const HomeScreen = () => {
           </View>
         </View>
         <Text style={styles.streakDescription}>
-          {streakUpdatedToday
-            ? 'Come back tomorrow to update your streak again!'
-            : 'Complete both a workout and mental session daily to maintain your streak!'}
+          Complete both a workout and mental session daily to maintain your streak!
         </Text>
       </View>
 
@@ -709,6 +698,20 @@ const HomeScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Add a button in the HomeScreen component (only in __DEV__) to force daily reset */}
+      {__DEV__ && (
+        <TouchableOpacity
+          style={{ backgroundColor: '#ff4444', padding: 12, borderRadius: 10, margin: 20, alignItems: 'center' }}
+          onPress={async () => {
+            console.log('Force Daily Reset button pressed');
+            await forceDailyReset(userProfile, calories, water, setCalories, setWater, setStats);
+            Alert.alert('Daily Reset', 'Forced daily reset complete. Check logs for details.');
+          }}
+        >
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Force Daily Reset (DEV)</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 };
@@ -1040,18 +1043,6 @@ const styles = StyleSheet.create({
   },
   activityCompleted: {
     color: '#00ffff',
-  },
-  updateStreakButton: {
-    backgroundColor: '#00ffff',
-    borderRadius: 8,
-    padding: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  updateStreakButtonText: {
-    color: '#000',
-    fontSize: 14,
-    fontWeight: 'bold',
   },
 });
 

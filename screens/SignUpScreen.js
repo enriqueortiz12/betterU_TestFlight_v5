@@ -68,7 +68,7 @@ const SignUpScreen = ({ navigation }) => {
         // Create a profile for the new user
         const { error: profileError } = await supabase.from("profiles").insert([
           {
-            user_id: data.user.id,
+            profile_id: data.user.id,
             full_name: fullName,
             email,
           },

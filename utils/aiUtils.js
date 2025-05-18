@@ -4,11 +4,14 @@ import { useUser } from "../context/UserContext"
 /**
  * Generates an AI response using the OpenAI API
  * @param {string} userMessage - The user's message to generate a response for
- * @param {object} userProfile - The user's profile data
+ * @param {object} userData - The user's full data (profile, stats, history, PRs, goals, mood, etc)
+ * @param {string} systemPrompt - The system prompt for the AI
  * @returns {Promise<{success: boolean, response?: string, error?: string}>} - The result object
  */
-export const generateAIResponse = async (userMessage, userProfile) => {
-  console.log("Generating AI response for:", userMessage)
+export const generateAIResponse = async (userMessage, userData = {}, systemPrompt = '') => {
+  console.warn('=== AI TRAINER MESSAGE SENT: generateAIResponse CALLED ===');
+  console.warn('[AI] generateAIResponse called');
+  console.log("[AI] Generating AI response for:", userMessage)
 
   try {
     // Fallback responses for development/demo
@@ -25,26 +28,33 @@ export const generateAIResponse = async (userMessage, userProfile) => {
 
     // Get the API key
     const key = await getOpenAIApiKey()
-    console.log("API Key status:", key ? "Present" : "Missing")
+    console.log("[AI] API Key status:", key ? "Present" : "Missing", "Key:", key ? key.slice(0, 8) + '...' : '');
 
     if (!key) {
-      console.log("No API key, using fallback response")
+      console.log("[AI] No API key, using fallback response")
       return {
         success: true,
         response: fallbackResponse
       }
     }
 
-    // Create user profile context
-    const profileContext = userProfile ? `
-      User Profile:
-      - Age: ${userProfile.age || 'Not specified'}
-      - Weight: ${userProfile.weight || 'Not specified'} kg
-      - Height: ${userProfile.height || 'Not specified'} cm
-      - Fitness Goal: ${userProfile.fitness_goal || 'Not specified'}
-      - Gender: ${userProfile.gender || 'Not specified'}
-      - Training Level: ${userProfile.training_level || 'intermediate'}
-    ` : '';
+    // Compose a context message with all user data
+    const contextMessage = userData && Object.keys(userData).length > 0
+      ? `User Data Context (for reference, use when relevant):\n${JSON.stringify(userData, null, 2)}`
+      : '';
+
+    // Prepare the request payload
+    const payload = {
+      model: "gpt-3.5-turbo",
+      messages: [
+        systemPrompt ? { role: "system", content: systemPrompt } : { role: "system", content: "You are an AI fitness trainer assistant. You provide helpful, encouraging, and accurate advice about workouts, nutrition, and fitness goals. Keep your responses concise (under 150 words) and focused on fitness advice." },
+        contextMessage ? { role: "system", content: contextMessage } : null,
+        { role: "user", content: userMessage },
+      ].filter(Boolean),
+      max_tokens: 500,
+      temperature: 0.7,
+    };
+    console.log("[AI] OpenAI request payload:", JSON.stringify(payload, null, 2));
 
     // Create the request to OpenAI API
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -53,26 +63,14 @@ export const generateAIResponse = async (userMessage, userProfile) => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${key}`,
       },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content:
-              `You are an AI fitness trainer assistant. You provide helpful, encouraging, and accurate advice about workouts, nutrition, and fitness goals. Keep your responses concise (under 150 words) and focused on fitness advice.\n\n${profileContext}`,
-          },
-          {
-            role: "user",
-            content: userMessage,
-          },
-        ],
-        max_tokens: 500,
-        temperature: 0.7,
-      }),
+      body: JSON.stringify(payload),
     })
 
+    console.log("[AI] OpenAI API response status:", response.status);
+
     if (!response.ok) {
-      console.log("OpenAI API error, using fallback")
+      const errorText = await response.text();
+      console.log("[AI] OpenAI API error, using fallback. Error:", errorText);
       return {
         success: true,
         response: fallbackResponse
@@ -80,8 +78,9 @@ export const generateAIResponse = async (userMessage, userProfile) => {
     }
 
     const data = await response.json()
+    console.log("[AI] OpenAI API raw response:", JSON.stringify(data, null, 2));
     if (!data.choices || !data.choices[0]?.message?.content) {
-      console.log("Invalid API response, using fallback")
+      console.log("[AI] Invalid API response, using fallback")
       return {
         success: true,
         response: fallbackResponse
@@ -93,7 +92,7 @@ export const generateAIResponse = async (userMessage, userProfile) => {
       response: data.choices[0].message.content
     }
   } catch (error) {
-    console.error("Error in generateAIResponse:", error)
+    console.error("[AI] Error in generateAIResponse:", error)
     // Always return a response, never fail
     return {
       success: true,

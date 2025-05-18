@@ -13,6 +13,7 @@ import { supabase } from '../../../lib/supabase';
 import { useUnits } from '../../../context/UnitsContext';
 import { Ionicons } from '@expo/vector-icons';
 import { formatBMI } from '../../../utils/formatUtils';
+import { useAuth } from '../../../context/AuthContext';
 
 const calculateBMI = (weight, height) => {
   // Convert height from cm to m
@@ -33,6 +34,7 @@ export default function SummaryScreen() {
   const [error, setError] = useState('');
   const { useImperial, convertWeight, convertHeight } = useUnits();
   const router = useRouter();
+  const { refetchProfile } = useAuth();
 
   useEffect(() => {
     fetchOnboardingData();
@@ -67,8 +69,7 @@ export default function SummaryScreen() {
     try {
       const { error: profileError } = await supabase
         .from('profiles')
-        .upsert({
-          user_id: onboardingData.id,
+        .update({
           full_name: onboardingData.full_name,
           email: onboardingData.email,
           age: onboardingData.age,
@@ -76,7 +77,9 @@ export default function SummaryScreen() {
           height: onboardingData.height,
           fitness_goal: onboardingData.fitness_goal,
           gender: onboardingData.gender,
-        });
+          onboarding_completed: true
+        })
+        .eq('id', onboardingData.id);
 
       if (profileError) throw profileError;
 
@@ -87,6 +90,9 @@ export default function SummaryScreen() {
         .eq('id', onboardingData.id);
 
       if (deleteError) throw deleteError;
+
+      // Refetch profile to update context
+      await refetchProfile();
 
       router.replace('/(tabs)/home');
     } catch (error) {

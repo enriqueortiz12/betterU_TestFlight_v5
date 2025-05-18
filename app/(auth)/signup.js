@@ -72,31 +72,14 @@ const SignupScreen = () => {
         Alert.alert("Error", error.message);
       } else if (data?.user) {
         try {
-          // First create the user record
-          const { error: userError } = await supabase
-            .from("users")
-            .insert([
-              {
-                id: data.user.id,
-              },
-            ]);
-
-          if (userError) {
-            console.error("Error creating user record:", userError);
-            Alert.alert("Error", "Failed to create user record");
-            return;
-          }
-
-          // Then create the onboarding data
+          // Create onboarding data
           const { error: onboardingError } = await supabase
             .from("onboarding_data")
-            .insert([
-              {
-                id: data.user.id,
-                full_name: fullName,
-                email: email,
-              },
-            ]);
+            .upsert({
+              id: data.user.id,
+              full_name: fullName,
+              email: email,
+            });
 
           if (onboardingError) {
             console.error("Error creating onboarding data:", onboardingError);
@@ -121,11 +104,7 @@ const SignupScreen = () => {
           }
         } catch (error) {
           console.error("Error in signup process:", error);
-          Alert.alert(
-            "Account Created",
-            "Your account was created, but we encountered an error. Please try logging in after confirming your email.",
-            [{ text: "Go to Login", onPress: () => router.push("/(auth)/login") }]
-          );
+          Alert.alert("Error", "An unexpected error occurred during signup");
         }
       }
     } catch (error) {

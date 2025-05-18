@@ -1,7 +1,7 @@
 "use client";
 
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Modal, Alert, Switch, Linking } from 'react-native';
-import { useAuth } from '../../context/AuthContext';
+import { useUser } from '../../context/UserContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -11,7 +11,7 @@ import { supabase } from '../../lib/supabase';
 import PremiumFeature from '../components/PremiumFeature';
 
 const ProfileScreen = () => {
-  const { profile, refetchProfile, updateProfile, isPremium } = useAuth();
+  const { userProfile, isLoading, updateProfile } = useUser();
   const { 
     convertWeight, 
     convertHeight, 
@@ -23,10 +23,11 @@ const ProfileScreen = () => {
     convertHeightBack 
   } = useUnits();
   const { calories, water, updateGoal } = useTracking();
-  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
-  const router = useRouter();
+  const [showUnitsModal, setShowUnitsModal] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
 
   const GOALS = [
     { id: 'athleticism', label: 'Athleticism', description: 'Enhance overall athletic performance' },
@@ -43,12 +44,6 @@ const ProfileScreen = () => {
   ];
 
   useEffect(() => {
-    const loadProfile = async () => {
-      setIsLoading(true);
-      await refetchProfile();
-      setIsLoading(false);
-    };
-    loadProfile();
   }, []);
 
   const calculateBMI = (weight, height) => {
@@ -113,13 +108,15 @@ const ProfileScreen = () => {
 
       setEditingField(null);
       setEditValue('');
-      await refetchProfile();
     } catch (error) {
       Alert.alert('Error', 'Failed to update profile');
     }
   };
 
   const validateInput = (field, value) => {
+    if (field === 'full_name') {
+      return value && value.trim().length > 0;
+    }
     const numValue = parseFloat(value);
     switch (field) {
       case 'age':
@@ -198,41 +195,6 @@ const ProfileScreen = () => {
         return;
       }
 
-      // First check if entry exists for today
-      const today = new Date().toISOString().split('T')[0];
-      const { data: existingEntry } = await supabase
-        .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
-        .select('*')
-        .eq('user_id', profile.user_id)
-        .eq('date', today)
-        .single();
-
-      if (existingEntry) {
-        // Update existing entry
-        const { error } = await supabase
-          .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
-          .update({
-            goal: numValue,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingEntry.id);
-
-        if (error) throw error;
-      } else {
-        // Insert new entry
-        const { error } = await supabase
-          .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
-          .insert({
-            user_id: profile.user_id,
-            date: today,
-            goal: numValue,
-            consumed: type === 'calories' ? calories.consumed : water.consumed,
-            updated_at: new Date().toISOString()
-          });
-
-        if (error) throw error;
-      }
-
       await updateGoal(type, numValue);
       setEditingField(null);
       setEditValue('');
@@ -266,7 +228,7 @@ const ProfileScreen = () => {
             >
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
-            <PremiumFeature isPremium={isPremium} onPress={() => handleGoalEdit(
+            <PremiumFeature isPremium={userProfile.isPremium} onPress={() => handleGoalEdit(
               editingField === 'calorie_goal' ? 'calories' : 'water',
               editValue
             )}>
@@ -339,6 +301,18 @@ const ProfileScreen = () => {
       );
     }
 
+    if (editingField === 'full_name') {
+      return (
+        <TextInput
+          style={styles.modalInput}
+          value={editValue}
+          onChangeText={setEditValue}
+          placeholder="Enter your name"
+          placeholderTextColor="#666"
+        />
+      );
+    }
+
     return (
       <>
         {(editingField === 'weight' || editingField === 'height') && (
@@ -378,7 +352,11 @@ const ProfileScreen = () => {
     );
   }
 
-  const bmi = calculateBMI(profile?.weight, profile?.height);
+  if (!userProfile || !userProfile.email) {
+    return <Text>No profile data found. Please complete onboarding.</Text>;
+  }
+
+  const bmi = calculateBMI(userProfile?.weight, userProfile?.height);
   const bmiCategory = getBMICategory(bmi);
 
   return (
@@ -391,15 +369,18 @@ const ProfileScreen = () => {
           <View style={styles.avatarContainer}>
             <Ionicons name="person-circle" size={80} color="#00ffff" />
           </View>
-          <Text style={styles.name}>{profile?.full_name || 'User'}</Text>
-          <Text style={styles.email}>{profile?.email}</Text>
+          <Text style={styles.name}>{userProfile?.full_name || 'User'}</Text>
+          <TouchableOpacity onPress={() => handleEdit('full_name', userProfile?.full_name)} style={{ position: 'absolute', right: 0, top: 10 }}>
+            <Ionicons name="create-outline" size={20} color="#00ffff" />
+          </TouchableOpacity>
+          <Text style={styles.email}>{userProfile?.email}</Text>
         </View>
 
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <View style={styles.statRow}>
-              <Text style={styles.statValue}>{formatValue(profile?.age)}</Text>
-              <TouchableOpacity onPress={() => handleEdit('age', profile?.age)}>
+              <Text style={styles.statValue}>{formatValue(userProfile?.age)}</Text>
+              <TouchableOpacity onPress={() => handleEdit('age', userProfile?.age)}>
                 <Ionicons name="create-outline" size={16} color="#00ffff" />
               </TouchableOpacity>
             </View>
@@ -408,9 +389,9 @@ const ProfileScreen = () => {
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <Text style={styles.statValue}>
-                {formatValue(profile?.weight, 'weight')}
+                {formatValue(userProfile?.weight, 'weight')}
               </Text>
-              <TouchableOpacity onPress={() => handleEdit('weight', profile?.weight)}>
+              <TouchableOpacity onPress={() => handleEdit('weight', userProfile?.weight)}>
                 <Ionicons name="create-outline" size={16} color="#00ffff" />
               </TouchableOpacity>
             </View>
@@ -419,9 +400,9 @@ const ProfileScreen = () => {
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <Text style={styles.statValue}>
-                {formatValue(profile?.height, 'height')}
+                {formatValue(userProfile?.height, 'height')}
               </Text>
-              <TouchableOpacity onPress={() => handleEdit('height', profile?.height)}>
+              <TouchableOpacity onPress={() => handleEdit('height', userProfile?.height)}>
                 <Ionicons name="create-outline" size={16} color="#00ffff" />
               </TouchableOpacity>
             </View>
@@ -438,9 +419,9 @@ const ProfileScreen = () => {
                 <Text style={styles.infoLabel}>Fitness Goal</Text>
                 <View style={styles.infoValueRow}>
                   <Text style={styles.infoValue}>
-                    {profile?.fitness_goal?.replace(/_/g, ' ') || 'Not set'}
+                    {userProfile?.fitness_goal?.replace(/_/g, ' ') || 'Not set'}
                   </Text>
-                  <TouchableOpacity onPress={() => handleEdit('fitness_goal', profile?.fitness_goal)}>
+                  <TouchableOpacity onPress={() => handleEdit('fitness_goal', userProfile?.fitness_goal)}>
                     <Ionicons name="create-outline" size={16} color="#00ffff" />
                   </TouchableOpacity>
                 </View>
@@ -453,9 +434,9 @@ const ProfileScreen = () => {
                 <Text style={styles.infoLabel}>Gender</Text>
                 <View style={styles.infoValueRow}>
                   <Text style={styles.infoValue}>
-                    {profile?.gender?.replace(/_/g, ' ') || 'Not set'}
+                    {userProfile?.gender?.replace(/_/g, ' ') || 'Not set'}
                   </Text>
-                  <TouchableOpacity onPress={() => handleEdit('gender', profile?.gender)}>
+                  <TouchableOpacity onPress={() => handleEdit('gender', userProfile?.gender)}>
                     <Ionicons name="create-outline" size={16} color="#00ffff" />
                   </TouchableOpacity>
                 </View>
@@ -497,7 +478,7 @@ const ProfileScreen = () => {
             <Text style={styles.modalTitle}>
                 {editingField === 'calorie_goal' ? 'Edit Calorie Goal' : 
                  editingField === 'water_goal' ? 'Edit Water Goal' : 
-                 'Edit Profile'}
+                 editingField === 'full_name' ? 'Edit Name' : 'Edit Profile'}
             </Text>
             {renderEditContent()}
             <View style={styles.modalButtons}>

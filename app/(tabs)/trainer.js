@@ -10,12 +10,15 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
+import { useTracking } from '../../context/TrackingContext';
 
 const TrainerScreen = () => {
   const router = useRouter();
-  const { isPremium } = useAuth();
+  const { isPremium } = useUser();
+  console.warn('[TrainerScreen] isPremium:', isPremium);
   const { userProfile } = useUser();
   const { conversations, sendMessage, clearConversations, isLoading, messageCount } = useTrainer();
+  const { stats, trackingData, mood } = useTracking();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const flatListRef = useRef(null);
@@ -35,7 +38,7 @@ const TrainerScreen = () => {
 
     setLoading(true);
     try {
-      const result = await sendMessage(input.trim());
+      const result = await sendMessage(input.trim(), { stats, trackingData, mood });
       if (!result.success) {
         Alert.alert('Error', result.error || 'Failed to send message');
       }
@@ -118,34 +121,44 @@ const TrainerScreen = () => {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <LinearGradient
-        colors={['#000', '#222', '#000']}
+        colors={['#00131a', '#00334d', '#000']}
         style={styles.gradient}
       >
         <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top }]}>
-          <View style={styles.header}>
-            <LinearGradient
-              colors={['#111', '#000']}
-              style={styles.headerGradient}
-            >
-              <View style={styles.headerContent}>
-                <Text style={styles.title}>AI Trainer</Text>
-                <View style={styles.statsContainer}>
-                  <Text style={[
-                    styles.messageCount,
-                    messageCount >= MAX_DAILY_MESSAGES && styles.messageCountLimit
-                  ]}>
-                    {`${messageCount}/${MAX_DAILY_MESSAGES}`}
-                  </Text>
-                  <TouchableOpacity 
-                    onPress={clearMessages} 
-                    style={styles.clearButton}
-                  >
-                    <Ionicons name="trash-outline" size={20} color="#00ffff" />
-                  </TouchableOpacity>
+          <Animated.View style={[styles.header, { opacity: fadeAnim, shadowColor: '#00ffff', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 10, backgroundColor: 'rgba(0,255,255,0.06)', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }]}>
+            <BlurView intensity={60} tint="dark" style={styles.headerBlur}>
+              <LinearGradient
+                colors={["rgba(0,255,255,0.18)", "rgba(0,0,0,0.7)"]}
+                style={styles.headerGradient}
+              >
+                <View style={[styles.headerContent, { paddingVertical: 24, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <View style={styles.profileAvatar}>
+                      <Ionicons name="person-circle" size={44} color="#00ffff" />
+                    </View>
+                    <View style={{ marginLeft: 16, justifyContent: 'center' }}>
+                      <Text style={styles.title}>AI Trainer</Text>
+                      <Text style={styles.subtitle}>Your Personalized Fitness Coach</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.statsContainer, { marginLeft: 16, alignSelf: 'flex-start' }]}>
+                    <Text style={[
+                      styles.messageCount,
+                      messageCount >= MAX_DAILY_MESSAGES && styles.messageCountLimit
+                    ]}>
+                      {`${messageCount}/${MAX_DAILY_MESSAGES}`}
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={clearMessages} 
+                      style={styles.clearButton}
+                    >
+                      <Ionicons name="trash-outline" size={22} color="#00ffff" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            </LinearGradient>
-          </View>
+              </LinearGradient>
+            </BlurView>
+          </Animated.View>
 
           {isLoading ? (
             <View style={styles.loadingContainer}>
@@ -153,37 +166,37 @@ const TrainerScreen = () => {
               <Text style={styles.loadingText}>Loading conversations...</Text>
             </View>
           ) : (
-          <FlatList
-            ref={flatListRef}
-            data={conversations}
-            renderItem={renderMessage}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.chatContainer}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-            showsVerticalScrollIndicator={false}
+            <FlatList
+              ref={flatListRef}
+              data={conversations}
+              renderItem={renderMessage}
+              keyExtractor={item => item.id}
+              contentContainerStyle={styles.chatContainer}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              showsVerticalScrollIndicator={false}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyText}>No messages yet</Text>
                 </View>
               }
-          />
+            />
           )}
 
           {loading && (
-            <BlurView intensity={80} style={styles.uploadingContainer}>
+            <BlurView intensity={90} tint="dark" style={styles.uploadingContainer}>
               <ActivityIndicator size="large" color="#00ffff" />
               <Text style={styles.uploadingText}>Thinking...</Text>
             </BlurView>
           )}
 
-          <BlurView intensity={30} style={styles.inputContainer}>
+          <BlurView intensity={40} tint="dark" style={styles.inputContainer}>
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
                 value={input}
                 onChangeText={setInput}
                 placeholder="Ask your AI trainer..."
-                placeholderTextColor="#666"
+                placeholderTextColor="#00ffff99"
                 editable={!loading && !isLoading && messageCount < MAX_DAILY_MESSAGES}
                 onSubmitEditing={handleSendMessage}
                 returnKeyType="send"
@@ -196,13 +209,17 @@ const TrainerScreen = () => {
                 disabled={!input.trim() || loading || isLoading || messageCount >= MAX_DAILY_MESSAGES}
               >
                 <LinearGradient
-                  colors={!input.trim() || loading || isLoading || messageCount >= MAX_DAILY_MESSAGES ? ['#333', '#222'] : ['#00ffff', '#0088ff']}
+                  colors={
+                    !input.trim() || loading || isLoading || messageCount >= MAX_DAILY_MESSAGES
+                      ? ['#333', '#222']
+                      : ['#00ffff', '#0088ff']
+                  }
                   style={styles.sendButtonGradient}
                 >
-                  <Ionicons name="send" size={24} color="#fff" />
+                  <Ionicons name="send" size={26} color="#fff" />
                 </LinearGradient>
               </TouchableOpacity>
-    </View>
+            </View>
           </BlurView>
         </SafeAreaView>
       </LinearGradient>
@@ -266,8 +283,8 @@ const styles = StyleSheet.create({
   },
   message: {
     flexDirection: 'row',
-    marginVertical: 8,
-    paddingHorizontal: 16,
+    marginVertical: 10,
+    paddingHorizontal: 8,
     maxWidth: '85%',
   },
   userMessage: {
@@ -291,13 +308,23 @@ const styles = StyleSheet.create({
   },
   userMessageContent: {
     backgroundColor: '#00ffff',
-    borderTopRightRadius: 4,
+    borderRadius: 22,
+    borderTopRightRadius: 8,
+    padding: 18,
+    marginBottom: 2,
   },
   aiMessageContent: {
-    backgroundColor: '#222',
-    borderTopLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 255, 0.1)',
+    backgroundColor: 'rgba(34, 34, 34, 0.85)',
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: '#00ffff55',
+    shadowColor: '#00ffff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 6,
+    padding: 18,
+    marginBottom: 2,
   },
   messageText: {
     fontSize: 16,
@@ -415,6 +442,33 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  headerBlur: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: 'hidden',
+  },
+  profileAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(0,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#00ffff55',
+    shadowColor: '#00ffff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  subtitle: {
+    color: '#00ffff',
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    marginTop: 2,
   },
 });
 

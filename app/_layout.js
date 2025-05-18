@@ -57,7 +57,7 @@ export default function RootLayout() {
         });
         
         if (isMounted) {
-          setIsReady(true);
+      setIsReady(true);
           setError(null);
         }
       } catch (error) {
@@ -83,15 +83,15 @@ export default function RootLayout() {
   if (!isReady) {
     return (
       <SafeAreaProvider>
-        <View style={styles.container}>
-          <ActivityIndicator size="large" color="#00ffff" />
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#00ffff" />
           <Text style={styles.loadingText}>{loadingStep}</Text>
           {error && (
             <Text style={styles.errorText}>
               {error}
             </Text>
           )}
-        </View>
+      </View>
       </SafeAreaProvider>
     );
   }

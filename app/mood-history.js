@@ -31,7 +31,7 @@ const MoodHistoryScreen = () => {
       const { data, error } = await supabase
         .from('mood_tracking')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('profile_id', user.id)
         .order('date', { ascending: false })
         .limit(30); // Show last 30 days
 

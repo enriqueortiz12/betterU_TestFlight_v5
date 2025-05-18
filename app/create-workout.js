@@ -3,8 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import PremiumFeature from './components/PremiumFeature';
-import { useAuth } from '../context/AuthContext';
+import { useUser } from '../context/UserContext';
 
 const popularExercises = [
   // Chest
@@ -30,7 +29,7 @@ const CreateWorkoutScreen = () => {
   const [workoutName, setWorkoutName] = useState('');
   const [selectedExercises, setSelectedExercises] = useState([]);
   const [saving, setSaving] = useState(false);
-  const { isPremium } = useAuth();
+  const { isPremium } = useUser();
 
   // Debug log
   console.log('CreateWorkoutScreen: isPremium =', isPremium);
@@ -74,8 +73,8 @@ const CreateWorkoutScreen = () => {
         .from('workouts')
         .insert([
           {
-            user_id: user.id,
-            name: workoutName,
+            profile_id: user.id,
+            workout_name: workoutName,
             exercises: selectedExercises,
           },
         ]);

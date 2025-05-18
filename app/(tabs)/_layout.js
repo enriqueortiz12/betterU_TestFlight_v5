@@ -52,17 +52,23 @@ export default function TabLayout() {
         <Tabs.Screen name="pr" options={{ title: 'PR' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
         <Tabs.Screen
-          name="workout-summary"
+          name="active-workout"
           options={{
             href: null,
           }}
         />
         <Tabs.Screen
+          name="workout-summary"
+          options={{
+              href: null,
+            }}
+          />
+        <Tabs.Screen
           name="settings"
           options={{
             href: null,
             presentation: 'modal',
-          }}
+        }}
         />
       </Tabs>
     </TrainerProvider>

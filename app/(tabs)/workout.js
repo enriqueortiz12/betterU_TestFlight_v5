@@ -5,7 +5,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../context/AuthContext';
+import { useUser } from '../../context/UserContext';
 
 const WorkoutScreen = () => {
   const router = useRouter();
@@ -14,27 +14,42 @@ const WorkoutScreen = () => {
   const [monthlyWorkouts, setMonthlyWorkouts] = useState(0);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [userWorkouts, setUserWorkouts] = useState([]);
-  const { isPremium } = useAuth();
+  const { isPremium } = useUser();
 
   const fetchWorkoutLogs = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      if (!user) {
+        console.log('No user found');
+        return;
+      }
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, user_id')
+        .eq('user_id', user.id)
+        .single();
+      console.log('Profile fetch result (logs):', profile, profileError);
+      let profileId;
+      if (profile && profile.id) {
+        profileId = profile.id;
+      } else {
+        console.log('No profile found for user', user.id, '- using user.id as profileId fallback');
+        profileId = user.id;
+      }
+      console.log('Fetching workout logs for profileId:', profileId);
       // Get current month's start and end dates
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
-
       const { data, error } = await supabase
-        .from('workout_logs')
+        .from('user_workout_logs')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('profile_id', profileId)
         .gte('completed_at', startOfMonth)
         .lte('completed_at', endOfMonth)
         .order('completed_at', { ascending: false });
-
       if (error) throw error;
+      console.log('Fetched workoutLogs:', data);
       setWorkoutLogs(data || []);
       setMonthlyWorkouts(data ? data.length : 0);
     } catch (error) {
@@ -45,32 +60,66 @@ const WorkoutScreen = () => {
   const deleteAllWorkoutLogs = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      if (!user) {
+        console.log('No user found');
+        return;
+      }
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, user_id')
+        .eq('user_id', user.id)
+        .single();
+      console.log('Profile fetch result (delete):', profile, profileError);
+      let profileId;
+      if (profile && profile.id) {
+        profileId = profile.id;
+      } else {
+        console.log('No profile found for user', user.id, '- using user.id as profileId fallback');
+        profileId = user.id;
+      }
+      console.log('Deleting workout logs for profileId:', profileId);
       const { error } = await supabase
-        .from('workout_logs')
+        .from('user_workout_logs')
         .delete()
-        .eq('user_id', user.id);
-
+        .eq('profile_id', profileId);
       if (error) throw error;
       setWorkoutLogs([]);
       setShowDeleteConfirmation(false);
+      Alert.alert('Success', 'All workout logs have been deleted');
     } catch (error) {
       console.error('Error deleting workout logs:', error);
-      Alert.alert('Error', 'Failed to delete workout logs');
+      Alert.alert('Error', 'Failed to delete workout logs. Please try again.');
     }
   };
 
   const fetchUserWorkouts = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('No user found');
+        return;
+      }
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, user_id')
+        .eq('user_id', user.id)
+        .single();
+      console.log('Profile fetch result (workouts):', profile, profileError);
+      let profileId;
+      if (profile && profile.id) {
+        profileId = profile.id;
+      } else {
+        console.log('No profile found for user', user.id, '- using user.id as profileId fallback');
+        profileId = user.id;
+      }
+      console.log('Fetching user workouts for profileId:', profileId);
       const { data, error } = await supabase
         .from('workouts')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('profile_id', profileId)
         .order('created_at', { ascending: false });
       if (error) throw error;
+      console.log('Fetched userWorkouts:', data);
       setUserWorkouts(data || []);
     } catch (error) {
       console.error('Error fetching user workouts:', error);
@@ -316,7 +365,7 @@ const WorkoutScreen = () => {
   ];
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }}>
       <View style={styles.header}>
         <Text style={styles.title}>Workouts</Text>
         <View style={styles.headerButtons}>
@@ -358,9 +407,9 @@ const WorkoutScreen = () => {
           userWorkouts.map((workout) => (
             <View key={workout.id} style={styles.workoutCard}>
               <View style={styles.workoutHeader}>
-                <Text style={styles.workoutTitle}>{workout.name}</Text>
+                <Text style={styles.workoutTitle}>{workout.workout_name || workout.name}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={styles.repRangeText}>{workout.exercises.length} exercises</Text>
+                  <Text style={styles.repRangeText}>{Array.isArray(workout.exercises) ? workout.exercises.length : 0} exercises</Text>
                   <TouchableOpacity onPress={() => handleDeleteWorkout(workout.id)}>
                     <Ionicons name="trash-outline" size={20} color="#ff4444" />
                   </TouchableOpacity>
@@ -369,15 +418,22 @@ const WorkoutScreen = () => {
               <Text style={styles.workoutDescription}>Custom workout</Text>
               <View style={styles.exercises}>
                 <Text style={styles.exercisesTitle}>Exercises:</Text>
-                {workout.exercises.map((ex, idx) => (
-                  <Text key={idx} style={styles.exercisesList}>
-                    • {ex.name} ({ex.sets} x {ex.reps})
-                  </Text>
-                ))}
+                {Array.isArray(workout.exercises) && workout.exercises.map((ex, idx) => {
+                  if (typeof ex === 'string') {
+                    return <Text key={idx} style={styles.exercisesList}>• {ex}</Text>;
+                  } else if (typeof ex === 'object' && ex !== null) {
+                    return <Text key={idx} style={styles.exercisesList}>• {ex.name} ({ex.sets || 3} x {ex.reps || 10})</Text>;
+                  } else {
+                    return null;
+                  }
+                })}
               </View>
               <TouchableOpacity 
                 style={styles.startButton}
-                onPress={() => startWorkout(workout)}
+                onPress={() => startWorkout({
+                  ...workout,
+                  name: workout.workout_name || workout.name,
+                })}
               >
                 <Text style={styles.startButtonText}>Start Workout</Text>
               </TouchableOpacity>

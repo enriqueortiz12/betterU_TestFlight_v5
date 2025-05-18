@@ -10,11 +10,12 @@ import { supabase } from '../lib/supabase';
 import { Audio } from 'expo-av';
 import Slider from '@react-native-community/slider';
 import PremiumFeature from './components/PremiumFeature';
+import { useUser } from '../context/UserContext';
 
 const ActiveMentalSession = () => {
   const router = useRouter();
-  const { user, isPremium } = useAuth();
   const { incrementStat } = useTracking();
+  const { user } = useAuth();
   const params = useLocalSearchParams();
   const [timeLeft, setTimeLeft] = useState(params.duration * 60);
   const [isActive, setIsActive] = useState(false);
@@ -26,6 +27,7 @@ const ActiveMentalSession = () => {
   const [volume, setVolume] = useState(1.0);
   const [isMuted, setIsMuted] = useState(false);
   const soundRef = useRef(null);
+  const { isPremium } = useUser();
 
   const session = {
     id: params.id,
@@ -33,7 +35,7 @@ const ActiveMentalSession = () => {
     duration: parseInt(params.duration),
     description: params.description,
     steps: JSON.parse(params.steps),
-    type: params.type
+    session_type: params.type
   };
 
   // Map session.id to audio file
@@ -223,14 +225,23 @@ const ActiveMentalSession = () => {
       const { error } = await supabase
         .from('mental_session_logs')
         .insert({
-          user_id: user.id,
+          profile_id: user.id,
           session_name: session.title,
-          session_type: session.type,
+          session_type: session.session_type,
           duration: session.duration,
           completed_at: new Date().toISOString()
         });
 
       if (error) throw error;
+
+      // Update today_mental_completed in user_stats
+      await supabase
+        .from('user_stats')
+        .update({
+          today_mental_completed: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('profile_id', user.id);
 
       // Update session state
       setIsActive(false);
@@ -259,19 +270,15 @@ const ActiveMentalSession = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('mental_session_logs')
-        .insert({
-          user_id: user.id,
-          session_name: session.title,
-          session_type: session.type,
-          duration: session.duration,
-          completed_at: new Date().toISOString()
-        });
+      // Update today_mental_completed in user_stats
+      await supabase
+        .from('user_stats')
+        .update({
+          today_mental_completed: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('profile_id', user.id);
 
-      if (error) throw error;
-
-      // Update session state
       setIsActive(false);
       await incrementStat('mental_sessions');
 
@@ -279,15 +286,15 @@ const ActiveMentalSession = () => {
       router.push({
         pathname: '/mental-session-summary',
         params: {
-          sessionType: session.type || 'meditation',
+          sessionType: session.session_type || 'meditation',
           duration: session.duration,
         },
       });
     } catch (error) {
-      console.error('Error saving mental session:', error);
+      console.error('Error finishing mental session:', error);
       Alert.alert(
         'Error',
-        'Failed to save your mental session. Please try again.'
+        'Failed to finish your mental session. Please try again.'
       );
     }
   };

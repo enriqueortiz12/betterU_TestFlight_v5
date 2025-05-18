@@ -4,7 +4,7 @@
     "slug": "betterU_TestFlight_v7",
     "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/betterUmobile.PNG",
+    "icon": "./assets/images/betterUmobile.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "jsEngine": "jsc",
@@ -21,7 +21,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/betterUmobile.PNG",
+        "foregroundImage": "./assets/images/betterUmobile.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.enriqueortiz.betteru",
@@ -33,7 +33,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/betterUmobile.PNG"
+      "favicon": "./assets/images/betterUmobile.png"
     },
     "plugins": [
       "expo-router",
@@ -41,7 +41,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/betterUmobile.PNG",
+          "image": "./assets/images/betterUmobile.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"

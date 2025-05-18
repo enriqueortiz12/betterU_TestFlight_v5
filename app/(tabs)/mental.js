@@ -146,7 +146,7 @@ const MentalScreen = () => {
       const { data, error } = await supabase
         .from('mood_tracking')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('profile_id', user.id)
         .gte('date', sevenDaysAgo.toISOString())
         .lte('date', now.toISOString())
         .order('date', { ascending: false });
@@ -179,7 +179,7 @@ const MentalScreen = () => {
       const { data: existingMoods, error: fetchError } = await supabase
         .from('mood_tracking')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('profile_id', user.id)
         .gte('date', today)
         .lt('date', new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString())
         .order('date', { ascending: false });
@@ -202,7 +202,7 @@ const MentalScreen = () => {
         const { error: insertError } = await supabase
           .from('mood_tracking')
           .insert({
-            user_id: user.id,
+            profile_id: user.id,
             mood: mood,
             date: now.toISOString()
           });
@@ -231,7 +231,7 @@ const MentalScreen = () => {
         duration: session.duration,
         description: session.description,
         steps: JSON.stringify(session.steps),
-        type: session.type || 'meditation'
+        session_type: session.type || 'meditation'
       }
     });
   };
@@ -244,7 +244,7 @@ const MentalScreen = () => {
       const { error } = await supabase
         .from('mental_sessions')
         .insert({
-          user_id: user.id,
+          profile_id: user.id,
           session_type: selectedSession.id,
           duration: selectedSession.duration,
           completed_at: new Date().toISOString(),
@@ -270,7 +270,7 @@ const MentalScreen = () => {
       router.push({
         pathname: '/mental-session-summary',
         params: {
-          sessionType: activeSession.type,
+          sessionType: activeSession.session_type,
           duration: activeSession.duration,
         },
       });
@@ -279,12 +279,13 @@ const MentalScreen = () => {
 
   const handleSaveSession = async (sessionData) => {
     try {
-      // Save to Supabase
+      // SUPABASE REMOVED: Commented out mental_sessions insert to Supabase
+      /*
       const { data, error } = await supabase
         .from('mental_sessions')
         .insert([
           {
-            user_id: user.id,
+            profile_id: user.id,
             type: sessionData.type,
             duration: sessionData.duration,
             calmness_level: sessionData.calmnessLevel,
@@ -294,8 +295,8 @@ const MentalScreen = () => {
         ]);
 
       if (error) throw error;
-      
       return data;
+      */
     } catch (error) {
       console.error('Error saving session:', error);
       throw error;
@@ -314,7 +315,7 @@ const MentalScreen = () => {
           id: 'box-breathing',
           title: 'Box Breathing',
           duration: 5,
-          type: 'breathing',
+          session_type: 'breathing',
           description: 'A simple but powerful breathing technique used by Navy SEALs',
           steps: JSON.stringify([
             'Breathe in slowly for 4 counts',
@@ -327,7 +328,7 @@ const MentalScreen = () => {
           id: '478-breathing',
           title: '4-7-8 Breathing',
           duration: 5,
-          type: 'breathing',
+          session_type: 'breathing',
           description: 'A relaxing breath pattern to reduce anxiety',
           steps: JSON.stringify([
             'Breathe in quietly through your nose for 4 counts',
@@ -349,7 +350,7 @@ const MentalScreen = () => {
           id: 'body-scan',
           title: 'Body Scan',
           duration: 10,
-          type: 'meditation',
+          session_type: 'meditation',
           description: 'Progressive relaxation through body awareness',
           steps: JSON.stringify([
             'Focus on your breath',
@@ -364,7 +365,7 @@ const MentalScreen = () => {
           id: 'mindful-meditation',
           title: 'Mindful Meditation',
           duration: 10,
-          type: 'meditation',
+          session_type: 'meditation',
           description: 'Present moment awareness practice',
           steps: JSON.stringify([
             'Find a comfortable position',
@@ -388,7 +389,7 @@ const MentalScreen = () => {
           id: 'progressive-relaxation',
           title: 'Progressive Relaxation',
           duration: 8,
-          type: 'stress-relief',
+          session_type: 'stress-relief',
           description: 'Release physical tension through muscle relaxation',
           steps: JSON.stringify([
             'Tense your feet for 5 seconds',
@@ -403,7 +404,7 @@ const MentalScreen = () => {
           id: 'visualization',
           title: 'Peaceful Place',
           duration: 8,
-          type: 'stress-relief',
+          session_type: 'stress-relief',
           description: 'Visualize a calm and peaceful place',
           steps: JSON.stringify([
             'Close your eyes gently',
@@ -453,7 +454,7 @@ const MentalScreen = () => {
       {activeSession ? (
         <View style={styles.activeSessionContainer}>
           <Text style={styles.activeSessionTitle}>
-            {activeSession.type === 'meditation' ? 'Meditation' : 'Breathing Exercise'}
+            {activeSession.session_type === 'meditation' ? 'Meditation' : 'Breathing Exercise'}
           </Text>
           <Text style={styles.timer}>{formatTime(remainingTime)}</Text>
           <TouchableOpacity

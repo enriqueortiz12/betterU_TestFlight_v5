@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "BetterU",
     slug: "betterutestflightv8",
-    version: "1.0.1",
+    version: "1.0.2",
     orientation: "portrait",
     icon: "./assets/images/icon.jpg",
     userInterfaceStyle: "light",
@@ -20,7 +20,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.enriqueortiz.betteru",
-      buildNumber: "23",
+      buildNumber: "25",
       infoPlist: {
         NSCameraUsageDescription: "This app uses the camera to let you take profile pictures.",
         NSPhotoLibraryUsageDescription: "This app uses the photo library to let you select profile pictures.",

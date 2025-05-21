@@ -2,7 +2,7 @@
   "expo": {
     "name": "betterU",
     "slug": "betterU_TestFlight_v7",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/betterUmobile.png",
     "scheme": "myapp",

@@ -44,38 +44,69 @@ export default function GoalGenderScreen() {
   const [selectedGoal, setSelectedGoal] = useState('');
   const [selectedGender, setSelectedGender] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleNext = async () => {
+    if (isLoading) return;
     if (!selectedGoal || !selectedGender) {
       setError('Please select both your goal and gender');
       return;
     }
 
     try {
+      setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user?.id) {
         router.replace('/(auth)/login');
         return;
       }
 
-      const { error: storageError } = await supabase
+      console.log('Saving goal and gender data...');
+      // First, check if onboarding data exists
+      const { data: existingData, error: fetchError } = await supabase
         .from('onboarding_data')
-        .update({
-          fitness_goal: selectedGoal,
-          gender: selectedGender,
-        })
-        .eq('id', session.user.id);
+        .select('id')
+        .eq('id', session.user.id)
+        .single();
+
+      let storageError;
+      if (fetchError && fetchError.code === 'PGRST116') {
+        // If no data exists, create it
+        const { error: insertError } = await supabase
+          .from('onboarding_data')
+          .insert({
+            id: session.user.id,
+            fitness_goals: [selectedGoal],
+            gender: selectedGender
+          });
+        storageError = insertError;
+      } else {
+        // If data exists, update it
+        const { error: updateError } = await supabase
+          .from('onboarding_data')
+          .update({
+            fitness_goals: [selectedGoal],
+            gender: selectedGender
+          })
+          .eq('id', session.user.id);
+        storageError = updateError;
+      }
 
       if (storageError) {
+        console.error('Error saving data:', storageError);
         setError('Failed to save data. Please try again.');
+        setIsLoading(false);
         return;
       }
 
-      router.push('/(auth)/onboarding/height');
+      console.log('Data saved successfully, navigating to training level...');
+      // Use a direct navigation approach
+      router.push('/(auth)/onboarding/training-level');
     } catch (error) {
       console.error('Error in handleNext:', error);
       setError('An unexpected error occurred. Please try again.');
+      setIsLoading(false);
     }
   };
 
@@ -156,9 +187,13 @@ export default function GoalGenderScreen() {
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            <TouchableOpacity style={styles.button} onPress={handleNext}>
-              <Text style={styles.buttonText}>Next</Text>
-              <Ionicons name="arrow-forward" size={20} color="#000" style={styles.buttonIcon} />
+            <TouchableOpacity 
+              style={[styles.button, isLoading && styles.buttonDisabled]} 
+              onPress={handleNext}
+              disabled={isLoading}
+            >
+              <Text style={styles.buttonText}>{isLoading ? 'Saving...' : 'Next'}</Text>
+              {!isLoading && <Ionicons name="arrow-forward" size={20} color="#000" style={styles.buttonIcon} />}
             </TouchableOpacity>
           </View>
         </View>
@@ -270,5 +305,8 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 30,
     textAlign: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
 }); 

@@ -1,5 +1,6 @@
 import { getOpenAIApiKey } from "./apiConfig"
 import { useUser } from "../context/UserContext"
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Generates an AI response using the OpenAI API
@@ -38,6 +39,23 @@ export const generateAIResponse = async (userMessage, userData = {}, systemPromp
       }
     }
 
+    // Get conversation history from AsyncStorage
+    let conversationHistory = [];
+    try {
+      const storedConversations = await AsyncStorage.getItem('trainerConversations');
+      if (storedConversations) {
+        conversationHistory = JSON.parse(storedConversations);
+      }
+    } catch (error) {
+      console.error("[AI] Error loading conversation history:", error);
+    }
+
+    // Format conversation history for context
+    const conversationMessages = conversationHistory.map(msg => ({
+      role: msg.sender === 'user' ? 'user' : 'assistant',
+      content: msg.message
+    }));
+
     // Compose a context message with all user data
     const contextMessage = userData && Object.keys(userData).length > 0
       ? `User Data Context (for reference, use when relevant):\n${JSON.stringify(userData, null, 2)}`
@@ -47,8 +65,9 @@ export const generateAIResponse = async (userMessage, userData = {}, systemPromp
     const payload = {
       model: "gpt-3.5-turbo",
       messages: [
-        systemPrompt ? { role: "system", content: systemPrompt } : { role: "system", content: "You are an AI fitness trainer assistant. You provide helpful, encouraging, and accurate advice about workouts, nutrition, and fitness goals. Keep your responses concise (under 150 words) and focused on fitness advice." },
+        systemPrompt ? { role: "system", content: systemPrompt } : { role: "system", content: "You are an AI fitness trainer assistant. You provide helpful, encouraging, and accurate advice about workouts, nutrition, and fitness goals. Keep your responses concise (under 150 words) and focused on fitness advice. Always maintain context from previous messages in the conversation." },
         contextMessage ? { role: "system", content: contextMessage } : null,
+        ...conversationMessages,
         { role: "user", content: userMessage },
       ].filter(Boolean),
       max_tokens: 500,

@@ -23,7 +23,7 @@ const MentalSessionLog = () => {
         .from('mental_session_logs')
         .select('*')
         .eq('profile_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('completed_at', { ascending: false });
 
       if (error) throw error;
       setSessions(data || []);
@@ -122,7 +122,7 @@ const MentalSessionLog = () => {
                   <Ionicons name="trash-outline" size={20} color="#ff4444" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.sessionDate}>{formatDate(session.created_at)}</Text>
+              <Text style={styles.sessionDate}>{formatDate(session.completed_at)}</Text>
               <Text style={styles.sessionDuration}>Duration: {session.duration} minutes</Text>
               {session.calmness_level && (
                 <Text style={styles.calmnessLevel}>

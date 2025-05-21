@@ -23,31 +23,20 @@ const WorkoutScreen = () => {
         console.log('No user found');
         return;
       }
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, user_id')
-        .eq('user_id', user.id)
-        .single();
-      console.log('Profile fetch result (logs):', profile, profileError);
-      let profileId;
-      if (profile && profile.id) {
-        profileId = profile.id;
-      } else {
-        console.log('No profile found for user', user.id, '- using user.id as profileId fallback');
-        profileId = user.id;
-      }
-      console.log('Fetching workout logs for profileId:', profileId);
+
       // Get current month's start and end dates
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
+
       const { data, error } = await supabase
         .from('user_workout_logs')
         .select('*')
-        .eq('profile_id', profileId)
+        .eq('user_id', user.id)
         .gte('completed_at', startOfMonth)
         .lte('completed_at', endOfMonth)
         .order('completed_at', { ascending: false });
+
       if (error) throw error;
       console.log('Fetched workoutLogs:', data);
       setWorkoutLogs(data || []);
@@ -64,24 +53,12 @@ const WorkoutScreen = () => {
         console.log('No user found');
         return;
       }
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, user_id')
-        .eq('user_id', user.id)
-        .single();
-      console.log('Profile fetch result (delete):', profile, profileError);
-      let profileId;
-      if (profile && profile.id) {
-        profileId = profile.id;
-      } else {
-        console.log('No profile found for user', user.id, '- using user.id as profileId fallback');
-        profileId = user.id;
-      }
-      console.log('Deleting workout logs for profileId:', profileId);
+
       const { error } = await supabase
         .from('user_workout_logs')
         .delete()
-        .eq('profile_id', profileId);
+        .eq('user_id', user.id);
+
       if (error) throw error;
       setWorkoutLogs([]);
       setShowDeleteConfirmation(false);
@@ -367,40 +344,92 @@ const WorkoutScreen = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }}>
       <View style={styles.header}>
-        <Text style={styles.title}>Workouts</Text>
-        <View style={styles.headerButtons}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.title}>Workouts</Text>
           <TouchableOpacity 
-            style={styles.logButton}
+            style={styles.createWorkoutButton}
             onPress={() => setShowLogs(true)}
           >
-            <Text style={styles.logButtonText}>Logs</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterButton}>
-            <Ionicons name="filter" size={24} color="#fff" />
+            <Ionicons name="time-outline" size={20} color="#00ffff" style={{marginRight: 6}} />
+            <Text style={styles.createWorkoutButtonText}>View Logs</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Create Workout and Training Plans buttons stacked under Workouts header */}
       <View style={{marginHorizontal: 20, marginTop: 10, marginBottom: 0}}>
         <TouchableOpacity 
           style={styles.trainingPlansButton}
-          onPress={() => router.push('/create-workout')}
+          onPress={() => router.push('/(tabs)/pr')}
         >
-          <Ionicons name="add-circle-outline" size={20} color="#00ffff" style={{marginRight: 6}} />
-          <Text style={styles.trainingPlansButtonText}>Create Workout</Text>
+          <Ionicons name="trophy-outline" size={20} color="#00ffff" style={{marginRight: 6}} />
+          <Text style={styles.trainingPlansButtonText}>View Personal Records</Text>
         </TouchableOpacity>
-      <TouchableOpacity 
-        style={styles.trainingPlansButton}
-        onPress={() => router.push('/training-plans')}
-      >
-        <Text style={styles.trainingPlansButtonText}>Training Plans</Text>
-      </TouchableOpacity>
+      </View>
+
+      {/* Quick Actions */}
+      <View style={styles.quickActions}>
+        <View style={{ position: 'relative' }}>
+          <TouchableOpacity 
+            style={[styles.actionButton, !isPremium && styles.disabledButton]}
+            onPress={() => {
+              if (!isPremium) {
+                Alert.alert(
+                  'Premium Feature',
+                  'Upgrade to Premium to create custom workouts!',
+                  [{ text: 'OK' }]
+                );
+                return;
+              }
+              router.push('/create-workout');
+            }}
+            disabled={!isPremium}
+          >
+            <Ionicons name="add-circle-outline" size={24} color="#00ffff" />
+            <Text style={styles.actionButtonText}>Create Workout</Text>
+          </TouchableOpacity>
+          {!isPremium && (
+            <View style={styles.lockOverlay}>
+              <Ionicons name="lock-closed" size={28} color="#fff" style={{ opacity: 0.85 }} />
+            </View>
+          )}
+        </View>
+        <View style={{ position: 'relative' }}>
+          <TouchableOpacity 
+            style={[styles.actionButton, !isPremium && styles.disabledButton]}
+            onPress={() => {
+              if (!isPremium) {
+                Alert.alert(
+                  'Premium Feature',
+                  'Upgrade to Premium to generate custom workouts!',
+                  [{ text: 'OK' }]
+                );
+                return;
+              }
+              // TODO: Implement workout generation
+              Alert.alert(
+                'Coming Soon',
+                'Workout generation will be available in the next update!',
+                [{ text: 'OK' }]
+              );
+            }}
+            disabled={!isPremium}
+          >
+            <Ionicons name="sparkles-outline" size={24} color="#00ffff" />
+            <Text style={styles.actionButtonText}>Generate Workout</Text>
+          </TouchableOpacity>
+          {!isPremium && (
+            <View style={styles.lockOverlay}>
+              <Ionicons name="lock-closed" size={28} color="#fff" style={{ opacity: 0.85 }} />
+            </View>
+          )}
+        </View>
       </View>
 
       {/* User's Custom Workouts */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Your Workouts</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Your Workouts</Text>
+        </View>
         {userWorkouts.length === 0 ? (
           <Text style={styles.emptyText}>No custom workouts yet.</Text>
         ) : (
@@ -444,7 +473,15 @@ const WorkoutScreen = () => {
 
       {/* Workout Types */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Workout Types</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Workout Types</Text>
+          <TouchableOpacity 
+            style={styles.createWorkoutButton}
+            onPress={() => router.push('/training-plans')}
+          >
+            <Text style={styles.createWorkoutButtonText}>Training Plans</Text>
+          </TouchableOpacity>
+        </View>
         
         {/* Full Body Workout */}
         <TouchableOpacity 
@@ -839,35 +876,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   header: {
+    padding: 20,
+    paddingTop: 60,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    paddingTop: 60,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  logButton: {
-    backgroundColor: 'rgba(0, 255, 255, 0.1)',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  logButtonText: {
-    color: '#00ffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  filterButton: {
-    padding: 5,
   },
   trainingPlansButton: {
     backgroundColor: 'rgba(0, 255, 255, 0.1)',
@@ -888,12 +908,18 @@ const styles = StyleSheet.create({
   },
   section: {
     padding: 20,
+    paddingBottom: 30,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 15,
   },
   workoutCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
@@ -1120,6 +1146,58 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     fontWeight: 'bold',
+  },
+  createWorkoutButton: {
+    backgroundColor: 'rgba(0, 255, 255, 0.1)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#00ffff',
+  },
+  createWorkoutButtonText: {
+    color: '#00ffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+    gap: 15,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 255, 255, 0.1)',
+    borderRadius: 15,
+    padding: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#00ffff',
+  },
+  actionButtonText: {
+    color: '#00ffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  disabledButton: {
+    opacity: 0.7,
+  },
+  lockOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
 });
 

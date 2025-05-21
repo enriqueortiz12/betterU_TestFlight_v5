@@ -11,9 +11,27 @@ import { LineChart } from 'react-native-chart-kit';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { withSpring, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { formatNumber, formatWeight, formatPercentage } from '../../utils/formatUtils';
+import { Picker } from '@react-native-picker/picker';
 
 const { width } = Dimensions.get('window');
 const chartWidth = width * 0.8;
+
+// Generate weight arrays for both kg and lbs
+const generateWeightArray = (unit) => {
+  const weights = [];
+  if (unit === 'kg') {
+    // Generate weights from 20kg to 300kg in 2.5kg increments
+    for (let i = 20; i <= 300; i += 2.5) {
+      weights.push(i.toFixed(1));
+    }
+  } else {
+    // Generate weights from 45lbs to 660lbs in 5lbs increments
+    for (let i = 45; i <= 660; i += 5) {
+      weights.push(i.toString());
+    }
+  }
+  return weights;
+};
 
 const PRScreen = () => {
   const { userProfile } = useUser();
@@ -25,16 +43,26 @@ const PRScreen = () => {
   const [selectedPR, setSelectedPR] = useState(null);
   const [newPR, setNewPR] = useState({
     exercise: '',
-    currentValue: '',
-    targetValue: '',
+    currentValue: getWeightUnit() === 'kg' ? '20.0' : '45',
+    targetValue: getWeightUnit() === 'kg' ? '20.0' : '45',
     unit: getWeightUnit()
   });
   const [userId, setUserId] = useState(null);
   const [editingPR, setEditingPR] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const insets = useSafeAreaInsets();
+  const [weightOptions, setWeightOptions] = useState(generateWeightArray(getWeightUnit()));
+  const [showCurrentPicker, setShowCurrentPicker] = useState(false);
+  const [showTargetPicker, setShowTargetPicker] = useState(false);
+  const [showExercisePicker, setShowExercisePicker] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const progressAnimation = useSharedValue(0);
+
+  // Update weight options when unit changes
+  useEffect(() => {
+    setWeightOptions(generateWeightArray(getWeightUnit()));
+  }, [getWeightUnit()]);
 
   // Conversion functions
   const kgToLbs = (kg) => kg * 2.20462;
@@ -62,6 +90,27 @@ const PRScreen = () => {
     }));
   }, [getWeightUnit]);
 
+  // Add effect to handle unit changes
+  useEffect(() => {
+    if (prGoals.length > 0) {
+      const updatedGoals = prGoals.map(pr => {
+        // If the stored unit is different from current unit, convert the values
+        if (pr.unit !== getWeightUnit()) {
+          const currentValue = pr.unit === 'kg' ? kgToLbs(pr.current_value) : lbsToKg(pr.current_value);
+          const targetValue = pr.unit === 'kg' ? kgToLbs(pr.target_value) : lbsToKg(pr.target_value);
+          return {
+            ...pr,
+            current_value: Math.round(currentValue),
+            target_value: Math.round(targetValue),
+            unit: getWeightUnit()
+          };
+        }
+        return pr;
+      });
+      setPRGoals(updatedGoals);
+    }
+  }, [getWeightUnit()]);
+
   const fetchPRGoals = async () => {
     if (!userId) return;
     try {
@@ -75,13 +124,21 @@ const PRScreen = () => {
       const convertedData = data?.map(pr => ({
         id: pr.id,
         exercise: pr.exercise,
-        current_value: parseFloat(pr.weight_current),
-        target_value: parseFloat(pr.weight_target),
+        // Always store the raw kg values from the database
+        current_value: pr.weight_current,
+        target_value: pr.weight_target,
         unit: getWeightUnit(),
         created_at: pr.created_at
       })) || [];
 
-      setPRGoals(convertedData);
+      // Convert to current unit
+      const finalData = convertedData.map(pr => ({
+        ...pr,
+        current_value: getWeightUnit() === 'lbs' ? Math.round(kgToLbs(pr.current_value)) : Math.round(pr.current_value),
+        target_value: getWeightUnit() === 'lbs' ? Math.round(kgToLbs(pr.target_value)) : Math.round(pr.target_value)
+      }));
+
+      setPRGoals(finalData);
     } catch (error) {
       console.error('Error fetching PR goals:', error);
     }
@@ -201,10 +258,13 @@ const PRScreen = () => {
   const startEditing = (pr) => {
     setEditingPR(pr);
     setIsEditMode(true);
+    // Convert the values to the current unit and round to whole numbers
+    const currentValue = getWeightUnit() === 'lbs' ? kgToLbs(pr.current_value) : pr.current_value;
+    const targetValue = getWeightUnit() === 'lbs' ? kgToLbs(pr.target_value) : pr.target_value;
     setNewPR({
       exercise: pr.exercise,
-      currentValue: pr.current_value.toString(),
-      targetValue: pr.target_value.toString(),
+      currentValue: Math.round(currentValue).toString(),
+      targetValue: Math.round(targetValue).toString(),
       unit: getWeightUnit()
     });
     setModalVisible(true);
@@ -309,13 +369,11 @@ const PRScreen = () => {
       return;
     }
     
-    console.log('Opening progress modal for PR:', pr);
-    
     setSelectedPR({
       ...pr,
-      current_value: parseFloat(pr.current_value),
-      target_value: parseFloat(pr.target_value),
-      unit: pr.unit || getWeightUnit()
+      current_value: pr.current_value,
+      target_value: pr.target_value,
+      unit: getWeightUnit()
     });
     setProgressModalVisible(true);
   };
@@ -338,10 +396,7 @@ const PRScreen = () => {
   const renderProgressModal = () => {
     if (!selectedPR) return null;
 
-    // Convert weights to the current unit
-    const currentValue = getWeightUnit() === 'lbs' ? kgToLbs(selectedPR.current_value) : selectedPR.current_value;
-    const targetValue = getWeightUnit() === 'lbs' ? kgToLbs(selectedPR.target_value) : selectedPR.target_value;
-    const progress = calculateProgress(currentValue, targetValue);
+    const progress = calculateProgress(selectedPR.current_value, selectedPR.target_value);
 
     return (
       <Modal
@@ -377,11 +432,15 @@ const PRScreen = () => {
                 <View style={styles.progressStats}>
                   <View style={styles.statItem}>
                     <Text style={styles.statLabel}>Current</Text>
-                    <Text style={styles.statValue}>{formatWeight(currentValue, getWeightUnit())}</Text>
+                    <Text style={styles.statValue}>
+                      {selectedPR.current_value} {selectedPR.unit}
+                    </Text>
                   </View>
                   <View style={styles.statItem}>
                     <Text style={styles.statLabel}>Target</Text>
-                    <Text style={styles.statValue}>{formatWeight(targetValue, getWeightUnit())}</Text>
+                    <Text style={styles.statValue}>
+                      {selectedPR.target_value} {selectedPR.unit}
+                    </Text>
                   </View>
                 </View>
 
@@ -411,89 +470,216 @@ const PRScreen = () => {
   };
 
   const renderPRCard = (pr) => {
-    // Convert weights to the current unit
-    const currentValue = getWeightUnit() === 'lbs' ? kgToLbs(pr.current_value) : pr.current_value;
-    const targetValue = getWeightUnit() === 'lbs' ? kgToLbs(pr.target_value) : pr.target_value;
-
     return (
-    <View key={pr.id} style={styles.prCard}>
-      <LinearGradient
-        colors={['#111', '#000']}
-        style={styles.prCardGradient}
-      >
-        <View style={styles.prContent}>
-          <View style={styles.prHeader}>
-            <Text style={styles.prExercise}>{pr.exercise}</Text>
-            <View style={styles.prActions}>
+      <View key={pr.id} style={styles.prCard}>
+        <LinearGradient
+          colors={['#111', '#000']}
+          style={styles.prCardGradient}
+        >
+          <View style={styles.prContent}>
+            <View style={styles.prHeader}>
+              <Text style={styles.prExercise}>{pr.exercise}</Text>
+              <View style={styles.prActions}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => startEditing(pr)}
+                >
+                  <Ionicons name="pencil" size={20} color="#00ffff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleDeletePress(pr)}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.prStats}>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Current</Text>
+                <Text style={styles.statValue}>
+                  {pr.current_value} {getWeightUnit()}
+                </Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Target</Text>
+                <Text style={styles.statValue}>
+                  {pr.target_value} {getWeightUnit()}
+                </Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Progress</Text>
+                <Text style={styles.statValue}>
+                  {formatPercentage(calculateProgress(pr.current_value, pr.target_value))}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.progressBarContainer}>
+              <LinearGradient
+                colors={['#00ffff', '#0088ff']}
+                style={[
+                  styles.progressFill,
+                  { 
+                    width: `${calculateProgress(pr.current_value, pr.target_value)}%`
+                  }
+                ]}
+              />
+            </View>
+
+            <View style={styles.cardFooter}>
+              <Text style={styles.estimatedTime}>
+                Est. completion: {calculateETA(pr.current_value, pr.target_value)}
+              </Text>
               <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => startEditing(pr)}
+                style={styles.detailsButton}
+                onPress={() => handleViewProgress(pr)}
               >
-                <Ionicons name="pencil" size={20} color="#00ffff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => handleDeletePress(pr)}
-              >
-                <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                <Text style={styles.detailsButtonText}>Details</Text>
+                <Ionicons name="chevron-forward" size={16} color="#00ffff" />
               </TouchableOpacity>
             </View>
           </View>
+        </LinearGradient>
+      </View>
+    );
+  };
 
-          <View style={styles.prStats}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Current</Text>
-              <Text style={styles.statValue}>
-                  {formatWeight(currentValue, getWeightUnit())}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Target</Text>
-              <Text style={styles.statValue}>
-                  {formatWeight(targetValue, getWeightUnit())}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Progress</Text>
-              <Text style={styles.statValue}>
-                  {formatPercentage(calculateProgress(currentValue, targetValue))}
-              </Text>
-            </View>
+  const renderWeightPicker = (visible, onClose, value, onSelect, title) => (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.pickerModalContainer}>
+        <View style={styles.pickerModalContent}>
+          <View style={styles.pickerHeader}>
+            <Text style={styles.pickerTitle}>{title}</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
           </View>
+          <ScrollView style={styles.pickerScroll}>
+            {weightOptions.map((weight) => (
+              <TouchableOpacity
+                key={weight}
+                style={[
+                  styles.pickerOption,
+                  value === weight && styles.pickerOptionSelected
+                ]}
+                onPress={() => {
+                  onSelect(weight);
+                  onClose();
+                }}
+              >
+                <Text style={[
+                  styles.pickerOptionText,
+                  value === weight && styles.pickerOptionTextSelected
+                ]}>
+                  {weight} {getWeightUnit()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
 
-          <View style={styles.progressBarContainer}>
-            <LinearGradient
-              colors={['#00ffff', '#0088ff']}
-              style={[
-                styles.progressFill,
-                { 
-                    width: `${calculateProgress(currentValue, targetValue)}%`
-                }
-              ]}
+  // Common exercises list
+  const commonExercises = [
+    'Bench Press',
+    'Squat',
+    'Deadlift',
+    'Overhead Press',
+    'Barbell Row',
+    'Pull-up',
+    'Push-up',
+    'Dumbbell Press',
+    'Lunges',
+    'Romanian Deadlift',
+    'Front Squat',
+    'Incline Bench Press',
+    'Decline Bench Press',
+    'Lat Pulldown',
+    'Face Pull',
+    'Bicep Curl',
+    'Tricep Extension',
+    'Shoulder Press',
+    'Lateral Raise',
+    'Leg Press',
+    'Leg Extension',
+    'Leg Curl',
+    'Calf Raise',
+    'Hip Thrust',
+    'Good Morning',
+    'Power Clean',
+    'Snatch',
+    'Clean and Jerk',
+    'Kettlebell Swing',
+    'Farmer\'s Walk'
+  ];
+
+  const filteredExercises = commonExercises.filter(exercise =>
+    exercise.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const renderExercisePicker = () => (
+    <Modal
+      visible={showExercisePicker}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowExercisePicker(false)}
+    >
+      <View style={styles.pickerModalContainer}>
+        <View style={styles.pickerModalContent}>
+          <View style={styles.pickerHeader}>
+            <Text style={styles.pickerTitle}>Select Exercise</Text>
+            <TouchableOpacity onPress={() => setShowExercisePicker(false)}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search exercises..."
+              placeholderTextColor="#666"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
           </View>
 
-          <View style={styles.cardFooter}>
-            <Text style={styles.estimatedTime}>
-                Est. completion: {calculateETA(currentValue, targetValue)}
-            </Text>
-            <TouchableOpacity
-              style={styles.detailsButton}
-                onPress={() => handleViewProgress({
-                  ...pr,
-                  current_value: currentValue,
-                  target_value: targetValue
-                })}
-            >
-              <Text style={styles.detailsButtonText}>Details</Text>
-              <Ionicons name="chevron-forward" size={16} color="#00ffff" />
-            </TouchableOpacity>
-          </View>
+          <ScrollView style={styles.pickerScroll}>
+            {filteredExercises.map((exercise) => (
+              <TouchableOpacity
+                key={exercise}
+                style={[
+                  styles.pickerOption,
+                  newPR.exercise === exercise && styles.pickerOptionSelected
+                ]}
+                onPress={() => {
+                  setNewPR({ ...newPR, exercise });
+                  setShowExercisePicker(false);
+                  setSearchQuery('');
+                }}
+              >
+                <Text style={[
+                  styles.pickerOptionText,
+                  newPR.exercise === exercise && styles.pickerOptionTextSelected
+                ]}>
+                  {exercise}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
-      </LinearGradient>
-    </View>
+      </View>
+    </Modal>
   );
-  };
 
   return (
     <KeyboardAvoidingView 
@@ -584,38 +770,60 @@ const PRScreen = () => {
                   >
                     <View style={styles.formGroup}>
                       <Text style={styles.inputLabel}>Exercise Name</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="e.g., Bench Press"
-                        placeholderTextColor="#666"
-                        value={newPR.exercise}
-                        onChangeText={(text) => setNewPR({ ...newPR, exercise: text })}
-                      />
+                      <TouchableOpacity
+                        style={styles.pickerButton}
+                        onPress={() => setShowExercisePicker(true)}
+                      >
+                        <Text style={styles.pickerButtonText}>
+                          {newPR.exercise || 'Select Exercise'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={20} color="#00ffff" />
+                      </TouchableOpacity>
                     </View>
 
                     <View style={styles.formGroup}>
                       <Text style={styles.inputLabel}>Current Value ({getWeightUnit()})</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder={`Your current ${getWeightUnit()}`}
-                        placeholderTextColor="#666"
-                        keyboardType="numeric"
-                        value={newPR.currentValue}
-                        onChangeText={(text) => setNewPR({ ...newPR, currentValue: text })}
-                      />
+                      <TouchableOpacity
+                        style={styles.pickerButton}
+                        onPress={() => setShowCurrentPicker(true)}
+                      >
+                        <Text style={styles.pickerButtonText}>
+                          {newPR.currentValue} {getWeightUnit()}
+                        </Text>
+                        <Ionicons name="chevron-down" size={20} color="#00ffff" />
+                      </TouchableOpacity>
                     </View>
 
                     <View style={styles.formGroup}>
                       <Text style={styles.inputLabel}>Target Value ({getWeightUnit()})</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder={`Your target ${getWeightUnit()}`}
-                        placeholderTextColor="#666"
-                        keyboardType="numeric"
-                        value={newPR.targetValue}
-                        onChangeText={(text) => setNewPR({ ...newPR, targetValue: text })}
-                      />
+                      <TouchableOpacity
+                        style={styles.pickerButton}
+                        onPress={() => setShowTargetPicker(true)}
+                      >
+                        <Text style={styles.pickerButtonText}>
+                          {newPR.targetValue} {getWeightUnit()}
+                        </Text>
+                        <Ionicons name="chevron-down" size={20} color="#00ffff" />
+                      </TouchableOpacity>
                     </View>
+
+                    {renderWeightPicker(
+                      showCurrentPicker,
+                      () => setShowCurrentPicker(false),
+                      newPR.currentValue,
+                      (value) => setNewPR({ ...newPR, currentValue: value }),
+                      'Select Current Weight'
+                    )}
+
+                    {renderWeightPicker(
+                      showTargetPicker,
+                      () => setShowTargetPicker(false),
+                      newPR.targetValue,
+                      (value) => setNewPR({ ...newPR, targetValue: value }),
+                      'Select Target Weight'
+                    )}
+
+                    {renderExercisePicker()}
 
                     <TouchableOpacity
                       style={styles.saveButton}
@@ -971,6 +1179,85 @@ const styles = StyleSheet.create({
   progressLabel: {
     color: '#666',
     fontSize: 14,
+  },
+  pickerButton: {
+    backgroundColor: '#222',
+    borderRadius: 12,
+    padding: 15,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  pickerButtonText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  pickerModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'flex-end',
+  },
+  pickerModalContent: {
+    backgroundColor: '#111',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  pickerScroll: {
+    maxHeight: 300,
+  },
+  pickerOption: {
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  pickerOptionSelected: {
+    backgroundColor: 'rgba(0, 255, 255, 0.1)',
+  },
+  pickerOptionText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  pickerOptionTextSelected: {
+    color: '#00ffff',
+    fontWeight: 'bold',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#222',
+    borderRadius: 12,
+    marginBottom: 15,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    height: 45,
+    color: '#fff',
+    fontSize: 16,
   },
 });
 

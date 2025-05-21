@@ -8,6 +8,7 @@ import { useTracking } from '../../context/TrackingContext';
 import { useAuth } from '../../context/AuthContext';
 import { useUser } from '../../context/UserContext';
 import { AppState } from 'react-native';
+import { useSettings } from '../../context/SettingsContext';
 
 const workoutData = {
   'Full Body Workout': {
@@ -1863,6 +1864,7 @@ const ActiveWorkoutScreen = () => {
   const { user } = useAuth();
   const params = useLocalSearchParams();
   const { updateStats, stats, incrementStat } = useTracking();
+  const { settings } = useSettings();
   const [elapsedTime, setElapsedTime] = useState(0);
   const [calories, setCalories] = useState(0);
   const [workout, setWorkout] = useState(null);
@@ -1889,8 +1891,10 @@ const ActiveWorkoutScreen = () => {
               // Try to find matching exercise in workoutData
               let found = null;
               for (const workout of Object.values(workoutData)) {
-                found = workout.exercises.find(e => e.name && e.name.toLowerCase() === ex.toLowerCase());
-                if (found) break;
+                if (workout.exercises) {
+                  found = workout.exercises.find(e => e.name && e.name.toLowerCase() === ex.toLowerCase());
+                  if (found) break;
+                }
               }
               // If found, use that exercise's data
               if (found) {
@@ -1928,75 +1932,79 @@ const ActiveWorkoutScreen = () => {
             };
           })
         });
-      } catch (e) {
-        console.error('Error parsing workout:', e);
-        setWorkout(workoutData['Full Body Workout']);
+      } catch (error) {
+        console.error('Error parsing workout:', error);
+        Alert.alert(
+          'Error',
+          'Failed to load workout. Please try again.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
       }
     } else {
-      setWorkout(workoutData[params.type] || workoutData['Full Body Workout']);
+      // Handle predefined workouts
+      const workoutName = params.type;
+      if (workoutData[workoutName]) {
+        setWorkout(workoutData[workoutName]);
+      } else {
+        console.error('Workout not found:', workoutName);
+        Alert.alert(
+          'Error',
+          'Workout not found. Please try again.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      }
     }
-  }, [params.custom, params.workout, params.type]);
+  }, [params.workout, params.custom, params.type]);
 
-  // --- Rest Time Preference Sync ---
+  // Initialize rest time from settings
   useEffect(() => {
-    let isMounted = true;
-    // Function to load rest time from AsyncStorage
-    const loadRestTime = async () => {
-      try {
-        const savedRestTime = await AsyncStorage.getItem('restTimeSeconds');
-        if (savedRestTime !== null) {
-          const parsedRestTime = parseInt(savedRestTime);
-          if (!isNaN(parsedRestTime) && isMounted) {
-            setRestTime(parsedRestTime);
-            setCurrentRestTime(parsedRestTime);
-          }
-        }
-      } catch (error) {
-        if (__DEV__) console.error('Error loading rest time:', error);
-      }
-    };
-    loadRestTime();
-    // Listen for app state changes to reload rest time
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
-        loadRestTime();
-      }
-    });
-    // Poll for changes every 2 seconds (robust sync)
-    const interval = setInterval(loadRestTime, 2000);
-    return () => {
-      isMounted = false;
-      subscription.remove();
-      clearInterval(interval);
-    };
-  }, []);
-  // --- End Rest Time Preference Sync ---
-
-  // Timer for workout duration
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setElapsedTime(prev => prev + 1);
-      // Rough estimate of calories burned (can be made more accurate)
-      setCalories(prev => prev + 0.1);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
+    if (settings?.rest_time_seconds) {
+      const newRestTime = parseInt(settings.rest_time_seconds);
+      setRestTime(newRestTime);
+      setCurrentRestTime(newRestTime);
+    }
+  }, [settings]);
 
   // Rest timer countdown
   useEffect(() => {
     let timer;
     if (restTimerActive && currentRestTime > 0) {
       timer = setInterval(() => {
-        setCurrentRestTime(prev => prev - 1);
+        setCurrentRestTime(prev => {
+          if (prev <= 1) {
+            setRestTimerActive(false);
+            setShowRestTimer(false);
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
-    } else if (currentRestTime === 0) {
-      setRestTimerActive(false);
-      setShowRestTimer(false);
     }
 
-    return () => clearInterval(timer);
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   }, [restTimerActive, currentRestTime]);
+
+  // Timer and calories tracking
+  useEffect(() => {
+    let timer;
+    if (workout) {
+      timer = setInterval(() => {
+        setElapsedTime(prev => {
+          const newTime = prev + 1;
+          // Calculate calories burned (rough estimate: 5 calories per minute)
+          const newCalories = Math.floor(newTime / 60 * 5);
+          setCalories(newCalories);
+          return newTime;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [workout]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -2008,7 +2016,6 @@ const ActiveWorkoutScreen = () => {
     const newWorkout = { ...workout };
     newWorkout.exercises[exerciseIndex].sets[setIndex].completed = true;
     setWorkout(newWorkout);
-    // Always use the latest restTime value
     setCurrentRestTime(restTime);
     setShowRestTimer(true);
     setRestTimerActive(true);
@@ -2027,11 +2034,10 @@ const ActiveWorkoutScreen = () => {
   };
 
   const saveWorkoutLog = async () => {
-    if (!userProfile || !userProfile.profile_id) {
-      console.error('No profile found for user');
+    if (!user?.id) {
+      console.error('No user found');
       return;
     }
-    const profileId = userProfile.profile_id;
     try {
       // Calculate completed sets and total weight
       let completedSets = 0;
@@ -2064,7 +2070,7 @@ const ActiveWorkoutScreen = () => {
       const { data: existingLog } = await supabase
         .from('user_workout_logs')
         .select('*')
-        .eq('profile_id', profileId)
+        .eq('user_id', user.id)
         .gte('completed_at', new Date().toISOString().split('T')[0])
         .single();
 
@@ -2079,7 +2085,7 @@ const ActiveWorkoutScreen = () => {
             exercise_count: exerciseCount,
             exercise_names: exerciseNames,
             total_weight: totalWeight,
-            duration: workout.duration || 0,
+            duration: elapsedTime,
             completed_at: new Date().toISOString()
           })
           .eq('id', existingLog.id);
@@ -2090,19 +2096,27 @@ const ActiveWorkoutScreen = () => {
         const { error } = await supabase
           .from('user_workout_logs')
           .insert({
-            profile_id: profileId,
+            user_id: user.id,
             workout_name: workout.workout_name || workout.name,
             exercises: exerciseData,
             completed_sets: completedSets,
             exercise_count: exerciseCount,
             exercise_names: exerciseNames,
             total_weight: totalWeight,
-            duration: workout.duration || 0,
+            duration: elapsedTime,
             completed_at: new Date().toISOString()
           });
 
         if (error) throw error;
       }
+
+      // Update stats
+      await updateStats(prev => ({
+        ...prev,
+        workouts: (prev.workouts || 0) + 1,
+        minutes: (prev.minutes || 0) + Math.floor(elapsedTime / 60),
+        today_workout_completed: true
+      }));
 
       // Show success message
       Alert.alert(
@@ -2125,11 +2139,10 @@ const ActiveWorkoutScreen = () => {
 
   const confirmFinish = async () => {
     try {
-      if (!userProfile || !userProfile.profile_id) {
-        console.error('No profile found for user');
+      if (!user?.id) {
+        console.error('No user found');
         return;
       }
-      const profileId = userProfile.profile_id;
       
       // Calculate stats
       let completedSets = 0;
@@ -2165,24 +2178,28 @@ const ActiveWorkoutScreen = () => {
         const { data: existingStats } = await supabase
           .from('user_stats')
           .select('*')
-          .eq('profile_id', profileId)
+          .eq('user_id', user.id)
           .single();
 
         if (existingStats) {
           const { error: statsError } = await supabase
             .from('user_stats')
             .update({
+              workouts_completed: (existingStats.workouts_completed || 0) + 1,
+              total_workout_minutes: (existingStats.total_workout_minutes || 0) + Math.floor(elapsedTime / 60),
               today_workout_completed: true,
               updated_at: new Date().toISOString()
             })
-            .eq('profile_id', profileId);
+            .eq('user_id', user.id);
 
           if (statsError) throw statsError;
         } else {
           const { error: statsError } = await supabase
             .from('user_stats')
             .insert({
-              profile_id: profileId,
+              user_id: user.id,
+              workouts_completed: 1,
+              total_workout_minutes: Math.floor(elapsedTime / 60),
               today_workout_completed: true,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
@@ -2197,7 +2214,7 @@ const ActiveWorkoutScreen = () => {
         const { error } = await supabase
           .from('user_workout_logs')
           .insert({
-            profile_id: profileId,
+            user_id: user.id,
             workout_name: workout.workout_name || workout.name,
             exercises: workout.exercises.map(exercise => ({
               name: exercise.name,
@@ -2221,16 +2238,25 @@ const ActiveWorkoutScreen = () => {
 
       // Update tracking stats with retry
       const minutesWorked = Math.floor(elapsedTime / 60);
-      await retryOperation(async () => {
-        await incrementStat('workouts', 1);
-        await incrementStat('minutes', minutesWorked);
-      });
       
-      // Update local state for workout completion
+      // Update local state first
       await updateStats(prev => ({
         ...prev,
+        workouts: (prev.workouts || 0) + 1,
+        minutes: (prev.minutes || 0) + minutesWorked,
         today_workout_completed: true
       }));
+
+      // Then update AsyncStorage
+      const currentStats = await AsyncStorage.getItem('stats');
+      const stats = currentStats ? JSON.parse(currentStats) : {};
+      const newStats = {
+        ...stats,
+        workouts: (stats.workouts || 0) + 1,
+        minutes: (stats.minutes || 0) + minutesWorked,
+        today_workout_completed: true
+      };
+      await AsyncStorage.setItem('stats', JSON.stringify(newStats));
 
       // Reset workout and hide confirmation
       resetWorkout();

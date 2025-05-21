@@ -22,10 +22,6 @@ export default function TabLayout() {
               iconName = focused ? 'leaf' : 'leaf-outline';
             } else if (route.name === 'trainer') {
               iconName = focused ? 'fitness' : 'fitness-outline';
-            } else if (route.name === 'pr') {
-              iconName = focused ? 'trophy' : 'trophy-outline';
-            } else if (route.name === 'profile') {
-              iconName = focused ? 'person' : 'person-outline';
             }
 
             return <Ionicons name={iconName} size={size} color={color} />;
@@ -49,8 +45,6 @@ export default function TabLayout() {
         <Tabs.Screen name="workout" options={{ title: 'Workout' }} />
         <Tabs.Screen name="mental" options={{ title: 'Mental' }} />
         <Tabs.Screen name="trainer" options={{ title: 'Trainer' }} />
-        <Tabs.Screen name="pr" options={{ title: 'PR' }} />
-        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
         <Tabs.Screen
           name="active-workout"
           options={{
@@ -60,15 +54,27 @@ export default function TabLayout() {
         <Tabs.Screen
           name="workout-summary"
           options={{
-              href: null,
-            }}
-          />
+            href: null,
+          }}
+        />
         <Tabs.Screen
           name="settings"
           options={{
             href: null,
             presentation: 'modal',
-        }}
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="pr"
+          options={{
+            href: null,
+          }}
         />
       </Tabs>
     </TrainerProvider>

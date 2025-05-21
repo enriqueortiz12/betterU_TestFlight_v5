@@ -7,6 +7,7 @@ import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { useState, useEffect } from 'react';
 import { preloadImages } from '../utils/imageUtils';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SettingsProvider } from '../context/SettingsContext';
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
@@ -103,11 +104,13 @@ export default function RootLayout() {
           console.log('UserProvider ready callback called');
           setContextsReady(true);
         }}>
-          <UnitsProvider>
-            <TrackingProvider>
-              <Slot />
-            </TrackingProvider>
-          </UnitsProvider>
+          <SettingsProvider>
+            <UnitsProvider>
+              <TrackingProvider>
+                <Slot />
+              </TrackingProvider>
+            </UnitsProvider>
+          </SettingsProvider>
         </UserProvider>
       </AuthProvider>
     </SafeAreaProvider>

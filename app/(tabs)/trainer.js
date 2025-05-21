@@ -125,35 +125,42 @@ const TrainerScreen = () => {
         style={styles.gradient}
       >
         <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top }]}>
-          <Animated.View style={[styles.header, { opacity: fadeAnim, shadowColor: '#00ffff', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 10, backgroundColor: 'rgba(0,255,255,0.06)', borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }]}>
-            <BlurView intensity={60} tint="dark" style={styles.headerBlur}>
+          <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
+            <BlurView intensity={90} tint="dark" style={styles.headerBlur}>
               <LinearGradient
-                colors={["rgba(0,255,255,0.18)", "rgba(0,0,0,0.7)"]}
+                colors={['rgba(0, 255, 255, 0.1)', 'rgba(0, 0, 0, 0.8)']}
                 style={styles.headerGradient}
               >
-                <View style={[styles.headerContent, { paddingVertical: 24, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={[styles.headerContent, { paddingVertical: 24 }]}>
+                  <View style={styles.headerLeft}>
                     <View style={styles.profileAvatar}>
-                      <Ionicons name="person-circle" size={44} color="#00ffff" />
+                      <LinearGradient
+                        colors={['#00ffff', '#0088ff']}
+                        style={styles.avatarGradient}
+                      >
+                        <Ionicons name="fitness" size={24} color="#fff" />
+                      </LinearGradient>
                     </View>
-                    <View style={{ marginLeft: 16, justifyContent: 'center' }}>
+                    <View style={styles.headerText}>
                       <Text style={styles.title}>AI Trainer</Text>
                       <Text style={styles.subtitle}>Your Personalized Fitness Coach</Text>
                     </View>
                   </View>
-                  <View style={[styles.statsContainer, { marginLeft: 16, alignSelf: 'flex-start' }]}>
-                    <Text style={[
-                      styles.messageCount,
-                      messageCount >= MAX_DAILY_MESSAGES && styles.messageCountLimit
-                    ]}>
-                      {`${messageCount}/${MAX_DAILY_MESSAGES}`}
-                    </Text>
-                    <TouchableOpacity 
-                      onPress={clearMessages} 
-                      style={styles.clearButton}
-                    >
-                      <Ionicons name="trash-outline" size={22} color="#00ffff" />
-                    </TouchableOpacity>
+                  <View style={styles.headerRight}>
+                    <View style={[styles.statsContainer, { marginLeft: 16 }]}>
+                      <Text style={[
+                        styles.messageCount,
+                        messageCount >= MAX_DAILY_MESSAGES && styles.messageCountLimit
+                      ]}>
+                        {`${messageCount}/${MAX_DAILY_MESSAGES}`}
+                      </Text>
+                      <TouchableOpacity 
+                        onPress={clearMessages} 
+                        style={styles.clearButton}
+                      >
+                        <Ionicons name="trash-outline" size={22} color="#00ffff" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               </LinearGradient>
@@ -240,7 +247,10 @@ const styles = StyleSheet.create({
   },
   header: {
     borderBottomWidth: 1,
-    borderBottomColor: '#222',
+    borderBottomColor: 'rgba(0, 255, 255, 0.1)',
+  },
+  headerBlur: {
+    overflow: 'hidden',
   },
   headerGradient: {
     paddingBottom: 15,
@@ -251,30 +261,81 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginRight: 16,
+    shadowColor: '#00ffff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  avatarGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerText: {
+    flex: 1,
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 4,
+    textShadowColor: 'rgba(0, 255, 255, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#00ffff',
+    opacity: 0.8,
   },
   statsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111',
+    backgroundColor: 'rgba(0, 255, 255, 0.1)',
     padding: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#222',
+    borderColor: 'rgba(0, 255, 255, 0.2)',
+    shadowColor: '#00ffff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   messageCount: {
     color: '#00ffff',
     fontWeight: 'bold',
     marginRight: 10,
+    fontSize: 14,
   },
   messageCountLimit: {
     color: '#ff4444',
   },
   clearButton: {
     padding: 5,
+    backgroundColor: 'rgba(0, 255, 255, 0.1)',
+    borderRadius: 12,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   chatContainer: {
     paddingHorizontal: 15,
@@ -442,33 +503,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-  },
-  headerBlur: {
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    overflow: 'hidden',
-  },
-  profileAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(0,255,255,0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#00ffff55',
-    shadowColor: '#00ffff',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  subtitle: {
-    color: '#00ffff',
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-    marginTop: 2,
   },
 });
 

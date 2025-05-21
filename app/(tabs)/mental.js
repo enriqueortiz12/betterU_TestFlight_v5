@@ -240,17 +240,18 @@ const MentalScreen = () => {
     try {
       if (!user) return;
 
-      // Save session to Supabase
-      const { error } = await supabase
-        .from('mental_sessions')
+      // Save detailed log
+      const { error: logError } = await supabase
+        .from('mental_session_logs')
         .insert({
           profile_id: user.id,
+          session_name: selectedSession.title,
           session_type: selectedSession.id,
           duration: selectedSession.duration,
-          completed_at: new Date().toISOString(),
+          completed_at: new Date().toISOString()
         });
 
-      if (error) throw error;
+      if (logError) throw logError;
 
       // Increment mental sessions count
       await incrementStat('mentalSessions');
@@ -279,24 +280,27 @@ const MentalScreen = () => {
 
   const handleSaveSession = async (sessionData) => {
     try {
-      // SUPABASE REMOVED: Commented out mental_sessions insert to Supabase
-      /*
-      const { data, error } = await supabase
-        .from('mental_sessions')
-        .insert([
-          {
-            profile_id: user.id,
-            type: sessionData.type,
-            duration: sessionData.duration,
-            calmness_level: sessionData.calmnessLevel,
-            notes: sessionData.notes,
-            created_at: new Date().toISOString()
-          }
-        ]);
+      if (!user) return;
 
-      if (error) throw error;
-      return data;
-      */
+      // Save detailed log
+      const { error: logError } = await supabase
+        .from('mental_session_logs')
+        .insert({
+          profile_id: user.id,
+          session_name: sessionData.type === 'meditation' ? 'Meditation Session' : 'Breathing Exercise',
+          session_type: sessionData.type,
+          duration: sessionData.duration,
+          calmness_level: sessionData.calmnessLevel,
+          notes: sessionData.notes,
+          completed_at: new Date().toISOString()
+        });
+
+      if (logError) throw logError;
+
+      // Update stats
+      await incrementStat('mental_sessions');
+      
+      return true;
     } catch (error) {
       console.error('Error saving session:', error);
       throw error;
@@ -591,7 +595,7 @@ const MentalScreen = () => {
               <Text style={styles.modalCloseButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-    </View>
+        </View>
       </Modal>
     </ScrollView>
   );

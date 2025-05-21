@@ -1,15 +1,16 @@
-import { View, Text, StyleSheet, TouchableOpacity, Switch, Alert, TextInput, Modal, Linking, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, Alert, TextInput, Modal, Linking, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useUnits } from '../../context/UnitsContext';
 import { useTracking } from '../../context/TrackingContext';
+import { useSettings } from '../../context/SettingsContext';
+import { useUser } from '../../context/UserContext';
 import PremiumFeature from '../components/PremiumFeature';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useUser } from '../../context/UserContext';
 import { Picker } from '@react-native-picker/picker';
 
 // Configure notification handler
@@ -29,7 +30,8 @@ const SettingsScreen = () => {
   const { signOut } = useAuth();
   const { isPremium } = useUser();
   const { useImperial, toggleUnits } = useUnits();
-  const { calories, water, updateGoal, stats } = useTracking();
+  const { calories, water, updateGoal } = useTracking();
+  const { settings, updateSettings, isLoading } = useSettings();
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -40,106 +42,40 @@ const SettingsScreen = () => {
 
   console.warn('[SettingsScreen] isPremium:', isPremium);
 
-  // Save rest time when changed
-  useEffect(() => {
-    const saveRestTime = async () => {
-      try {
-        await AsyncStorage.setItem('restTimeSeconds', String(restTimeSeconds));
-        if (__DEV__) console.log('Saved rest time:', restTimeSeconds);
-      } catch (error) {
-        if (__DEV__) console.error('Error saving rest time:', error);
-      }
-    };
-    saveRestTime();
-  }, [restTimeSeconds]);
-
   // Load saved settings on mount
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const enabled = await AsyncStorage.getItem('notificationsEnabled');
-        const time = await AsyncStorage.getItem('reminderTime');
-        const savedRest = await AsyncStorage.getItem('restTimeSeconds');
-        
-        setNotificationsEnabled(enabled === 'true');
-        if (time) setReminderTime(new Date(time));
-        if (savedRest) {
-          const parsedRest = Number(savedRest);
-          setRestTimeSeconds(parsedRest);
-          console.log('Loaded rest time:', parsedRest);
-        }
-      } catch (error) {
-        console.error('Error loading settings:', error);
-      }
-    };
-    loadSettings();
-  }, []);
+    if (settings) {
+      console.log('Loading settings from Supabase:', settings);
+      setNotificationsEnabled(settings.daily_reminders);
+      setRestTimeSeconds(settings.rest_time_seconds || 90); // Default to 90 seconds if not set
+    }
+  }, [settings]);
 
-  // Single effect to handle notification scheduling
-  useEffect(() => {
-    const updateNotifications = async () => {
-      if (notificationsEnabled) {
-        await scheduleDailyNotification(reminderTime);
-        await AsyncStorage.setItem('reminderTime', reminderTime.toISOString());
+  // Save settings when changed
+  const handleSettingsChange = async (key, value) => {
+    try {
+      console.log('Updating setting:', key, value);
+      const newSettings = { [key]: value };
+      const { success, error } = await updateSettings(newSettings);
+      if (!success) {
+        console.error('Error updating settings:', error);
+        Alert.alert('Error', 'Failed to update settings');
       } else {
-        await cancelAllNotifications();
+        console.log('Settings updated successfully');
       }
-      await AsyncStorage.setItem('notificationsEnabled', notificationsEnabled ? 'true' : 'false');
-    };
-
-    updateNotifications();
-  }, [notificationsEnabled, reminderTime]);
-
-  const scheduleDailyNotification = async (time) => {
-    try {
-      // First cancel any existing notifications
-      await Notifications.cancelAllScheduledNotificationsAsync();
-      
-      // Only schedule if notifications are enabled
-      if (!notificationsEnabled) return;
-
-      // Calculate trigger time
-      const trigger = new Date();
-      trigger.setHours(time.getHours());
-      trigger.setMinutes(time.getMinutes());
-      trigger.setSeconds(0);
-      
-      // If the time has already passed today, schedule for tomorrow
-      if (trigger < new Date()) {
-        trigger.setDate(trigger.getDate() + 1);
-      }
-
-      // Schedule the notification
-      const id = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'BetterU Reminder',
-          body: 'Time for your daily workout and mental session!',
-          sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-        },
-        trigger: {
-          hour: trigger.getHours(),
-          minute: trigger.getMinutes(),
-          repeats: false, // Only send once
-        },
-      });
-
-      console.log('Scheduled notification with ID:', id);
     } catch (error) {
-      console.error('Error scheduling notification:', error);
+      console.error('Error saving settings:', error);
+      Alert.alert('Error', 'Failed to save settings');
     }
   };
 
-  const cancelAllNotifications = async () => {
-    try {
-      await Notifications.cancelAllScheduledNotificationsAsync();
-      console.log('Cancelled all notifications');
-    } catch (error) {
-      console.error('Error cancelling notifications:', error);
-    }
+  // Handle rest time change
+  const handleRestTimeChange = async (seconds) => {
+    setRestTimeSeconds(seconds);
+    await handleSettingsChange('rest_time_seconds', seconds);
   };
 
-  // Only schedule/cancel streak notification when toggling notifications
+  // Handle notifications toggle
   const handleToggleNotifications = async () => {
     if (!notificationsEnabled) {
       const { status } = await Notifications.requestPermissionsAsync();
@@ -148,9 +84,11 @@ const SettingsScreen = () => {
         return;
       }
       setNotificationsEnabled(true);
+      await handleSettingsChange('daily_reminders', true);
       await scheduleStreakNotification();
     } else {
       setNotificationsEnabled(false);
+      await handleSettingsChange('daily_reminders', false);
       // Cancel streak notification when disabling
       const existingId = await AsyncStorage.getItem(STREAK_NOTIFICATION_ID_KEY);
       if (existingId) {
@@ -159,19 +97,15 @@ const SettingsScreen = () => {
     }
   };
 
-  const handleBackToProfile = () => {
-    router.back();
+  // Handle units toggle
+  const handleToggleUnits = async () => {
+    const newValue = !useImperial;
+    console.log('Toggling units to:', newValue);
+    await handleSettingsChange('use_imperial', newValue);
+    toggleUnits(newValue);
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.replace('/(auth)/login');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
+  // Handle goal updates
   const handleGoalEdit = async (type, value) => {
     try {
       const numValue = parseFloat(value);
@@ -180,10 +114,17 @@ const SettingsScreen = () => {
         return;
       }
 
+      if (type === 'calories') {
+        await handleSettingsChange('calorie_goal', numValue);
+      } else if (type === 'water') {
+        await handleSettingsChange('water_goal_ml', numValue * 1000); // Convert L to ml
+      }
+
       await updateGoal(type, numValue);
       setEditingField(null);
       setEditValue('');
     } catch (error) {
+      console.error('Error updating goal:', error);
       Alert.alert('Error', 'Failed to update goal');
     }
   };
@@ -229,6 +170,27 @@ const SettingsScreen = () => {
     }
   };
 
+  const handleBackToProfile = () => {
+    router.back();
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#00ffff" />
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }}>
       <View style={styles.header}>
@@ -259,7 +221,7 @@ const SettingsScreen = () => {
             <Text style={styles.settingLabel}>Use Imperial Units</Text>
             <Switch
               value={useImperial}
-              onValueChange={toggleUnits}
+              onValueChange={handleToggleUnits}
               trackColor={{ false: '#333', true: '#00ffff50' }}
               thumbColor={useImperial ? '#00ffff' : '#666'}
             />
@@ -393,13 +355,36 @@ const SettingsScreen = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Workout Preferences</Text>
         <View style={styles.card}>
-          <View style={styles.settingRow}>
+          <View style={[styles.settingRow, { position: 'relative' }]}>
             <Text style={styles.settingLabel}>Rest Time Between Sets</Text>
-            <TouchableOpacity onPress={() => setShowRestPicker(true)}>
+            <TouchableOpacity 
+              onPress={() => {
+                if (!isPremium) {
+                  Alert.alert(
+                    'Premium Feature',
+                    'Upgrade to Premium to customize your rest timer!',
+                    [{ text: 'OK' }]
+                  );
+                  return;
+                }
+                setShowRestPicker(true);
+              }}
+              disabled={!isPremium}
+            >
               <Text style={{ color: '#00ffff', fontWeight: 'bold', fontSize: 16 }}>{formatRestTime(restTimeSeconds)}</Text>
             </TouchableOpacity>
+            {!isPremium && (
+              <View style={styles.lockOverlay}>
+                <Ionicons name="lock-closed" size={28} color="#fff" style={{ opacity: 0.85 }} />
+              </View>
+            )}
           </View>
-          <Text style={styles.settingValue}>This rest time will be used for all workouts.</Text>
+          <Text style={styles.settingValue}>
+            {isPremium 
+              ? "This rest time will be used for all workouts."
+              : "Upgrade to Premium to customize your rest timer."
+            }
+          </Text>
         </View>
       </View>
 
@@ -428,42 +413,56 @@ const SettingsScreen = () => {
         <Modal
           visible={true}
           transparent={true}
-          animationType="slide"
+          animationType="fade"
           onRequestClose={() => setEditingField(null)}
         >
           <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>
-                {editingField === 'calorie_goal' ? 'Edit Calorie Goal' : 'Edit Water Goal'}
-              </Text>
-              <TextInput
-                style={styles.input}
-                value={editValue}
-                onChangeText={setEditValue}
-                keyboardType="numeric"
-                placeholder={editingField === 'calorie_goal' ? 'Enter calorie goal' : 'Enter water goal'}
-                placeholderTextColor="#666"
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => {
-                    setEditingField(null);
-                    setEditValue('');
-                  }}
+            <View style={[styles.modalContent, { alignItems: 'center', padding: 20 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {editingField === 'calorie_goal' ? 'Edit Calorie Goal' : 'Edit Water Goal'}
+                </Text>
+                <TouchableOpacity 
+                  style={styles.modalCloseButton}
+                  onPress={() => setEditingField(null)}
                 >
-                  <Text style={styles.buttonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.saveButton]}
-                  onPress={() => handleGoalEdit(
-                    editingField === 'calorie_goal' ? 'calories' : 'water',
-                    editValue
-                  )}
-                >
-                  <Text style={styles.buttonText}>Save</Text>
+                  <Ionicons name="close" size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={parseInt(editValue)}
+                  onValueChange={(value) => setEditValue(value.toString())}
+                  style={{ width: 200, color: '#fff', backgroundColor: Platform.OS === 'ios' ? 'transparent' : '#222' }}
+                  itemStyle={{ color: '#fff', fontSize: 22 }}
+                >
+                  {editingField === 'calorie_goal' ? (
+                    // Calorie options from 1000 to 5000 in steps of 100
+                    [...Array(41)].map((_, i) => {
+                      const value = 1000 + (i * 100);
+                      return <Picker.Item key={value} label={`${value} cal`} value={value} />;
+                    })
+                  ) : (
+                    // Water options from 1L to 5L in steps of 0.5L
+                    [...Array(9)].map((_, i) => {
+                      const value = 1 + (i * 0.5);
+                      return <Picker.Item key={value} label={`${value} L`} value={value} />;
+                    })
+                  )}
+                </Picker>
+              </View>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.saveButton, { marginTop: 20, width: '100%' }]} 
+                onPress={() => {
+                  handleGoalEdit(
+                    editingField === 'calorie_goal' ? 'calories' : 'water',
+                    editValue
+                  );
+                  setEditingField(null);
+                }}
+              >
+                <Text style={[styles.buttonText, { color: '#000' }]}>Save</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -471,21 +470,34 @@ const SettingsScreen = () => {
 
       <Modal visible={showRestPicker} transparent animationType="fade">
         <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, { alignItems: 'center' }]}> 
-            <Text style={styles.modalTitle}>Select Rest Time</Text>
-            <Picker
-              selectedValue={restTimeSeconds}
-              onValueChange={setRestTimeSeconds}
-              style={{ width: 200, color: '#fff', backgroundColor: Platform.OS === 'ios' ? 'transparent' : '#222' }}
-              itemStyle={{ color: '#fff', fontSize: 22 }}
+          <View style={[styles.modalContent, { alignItems: 'center', padding: 20 }]}> 
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Rest Time</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setShowRestPicker(false)}
+              >
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={restTimeSeconds}
+                onValueChange={handleRestTimeChange}
+                style={{ width: 200, color: '#fff', backgroundColor: Platform.OS === 'ios' ? 'transparent' : '#222' }}
+                itemStyle={{ color: '#fff', fontSize: 22 }}
+              >
+                {[...Array(19)].map((_, i) => {
+                  const val = 30 + i * 15;
+                  return <Picker.Item key={val} label={formatRestTime(val)} value={val} />;
+                })}
+              </Picker>
+            </View>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.saveButton, { marginTop: 20, width: '100%' }]} 
+              onPress={() => setShowRestPicker(false)}
             >
-              {[...Array(19)].map((_, i) => {
-                const val = 30 + i * 15;
-                return <Picker.Item key={val} label={formatRestTime(val)} value={val} />;
-              })}
-            </Picker>
-            <TouchableOpacity style={[styles.editButton, { marginTop: 20 }]} onPress={() => setShowRestPicker(false)}>
-              <Text style={styles.buttonText}>Done</Text>
+              <Text style={[styles.buttonText, { color: '#000' }]}>Save</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -499,6 +511,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
     paddingTop: 60,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     paddingHorizontal: 20,
@@ -603,72 +619,73 @@ const styles = StyleSheet.create({
     zIndex: 2,
     pointerEvents: 'auto',
   },
-  settingButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-  },
-  dangerText: {
-    fontSize: 16,
-    color: '#ff4444',
-    letterSpacing: 0.3,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#111',
-    borderRadius: 20,
-    padding: 20,
-    width: '90%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  input: {
-    backgroundColor: '#222',
-    borderRadius: 10,
-    padding: 15,
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 15,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  modalButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#333',
-  },
-  saveButton: {
-    backgroundColor: '#00ffff',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   settingRowWithBorder: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
     marginTop: 10,
     paddingTop: 20,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 15,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  modalCloseButton: {
+    padding: 5,
+  },
+  pickerContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 10,
+    padding: 10,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalButton: {
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButton: {
+    backgroundColor: '#00ffff',
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  settingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
+  },
+  dangerText: {
+    color: '#ff4444',
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: 8,
   },
 });
 

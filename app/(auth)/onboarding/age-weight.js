@@ -96,7 +96,7 @@ export default function AgeWeightScreen() {
         return;
       }
 
-      router.push('/(auth)/onboarding/goal-gender');
+      router.push('/(auth)/onboarding/height');
     } catch (error) {
       console.error('Error in handleNext:', error);
       setError('An unexpected error occurred. Please try again.');

@@ -48,14 +48,29 @@ export default function SummaryScreen() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from('onboarding_data')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
+      // Fetch both onboarding data and profile data
+      const [onboardingResponse, profileResponse] = await Promise.all([
+        supabase
+          .from('onboarding_data')
+          .select('*')
+          .eq('id', session.user.id)
+          .single(),
+        supabase
+          .from('profiles')
+          .select('training_level, full_name, email')
+          .eq('id', session.user.id)
+          .single()
+      ]);
 
-      if (error) throw error;
-      setOnboardingData(data);
+      if (onboardingResponse.error) throw onboardingResponse.error;
+      
+      // Combine the data
+      setOnboardingData({
+        ...onboardingResponse.data,
+        training_level: profileResponse.data?.training_level,
+        full_name: profileResponse.data?.full_name || onboardingResponse.data?.full_name,
+        email: profileResponse.data?.email || onboardingResponse.data?.email
+      });
     } catch (error) {
       console.error('Error fetching onboarding data:', error);
       setError('Failed to load your data');
@@ -67,6 +82,11 @@ export default function SummaryScreen() {
 
     setIsSubmitting(true);
     try {
+      // Get the first fitness goal from the array
+      const fitnessGoal = Array.isArray(onboardingData.fitness_goals) 
+        ? onboardingData.fitness_goals[0] 
+        : onboardingData.fitness_goals;
+
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
@@ -75,7 +95,7 @@ export default function SummaryScreen() {
           age: onboardingData.age,
           weight: onboardingData.weight,
           height: onboardingData.height,
-          fitness_goal: onboardingData.fitness_goal,
+          fitness_goal: fitnessGoal,
           gender: onboardingData.gender,
           onboarding_completed: true
         })
@@ -137,6 +157,14 @@ export default function SummaryScreen() {
               </View>
 
               <View style={styles.infoRow}>
+                <Ionicons name="mail-outline" size={24} color="#00ffff" />
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoLabel}>Email</Text>
+                  <Text style={styles.infoValue}>{onboardingData.email}</Text>
+                </View>
+              </View>
+
+              <View style={styles.infoRow}>
                 <Ionicons name="calendar-outline" size={24} color="#00ffff" />
                 <View style={styles.infoTextContainer}>
                   <Text style={styles.infoLabel}>Age</Text>
@@ -164,7 +192,19 @@ export default function SummaryScreen() {
                 <Ionicons name="trophy-outline" size={24} color="#00ffff" />
                 <View style={styles.infoTextContainer}>
                   <Text style={styles.infoLabel}>Goal</Text>
-                  <Text style={styles.infoValue}>{onboardingData.fitness_goal?.replace('_', ' ')}</Text>
+                  <Text style={styles.infoValue}>
+                    {onboardingData.fitness_goals?.[0]?.replace('_', ' ') || 'Not set'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.infoRow}>
+                <Ionicons name="barbell-outline" size={24} color="#00ffff" />
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoLabel}>Training Level</Text>
+                  <Text style={styles.infoValue}>
+                    {onboardingData.training_level?.charAt(0).toUpperCase() + onboardingData.training_level?.slice(1) || 'Not set'}
+                  </Text>
                 </View>
               </View>
 

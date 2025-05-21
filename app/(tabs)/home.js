@@ -7,7 +7,7 @@ import { useTracking, forceDailyReset } from '../../context/TrackingContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';
 import PremiumFeature from '../components/PremiumFeature';
-import { supabase } from '../../lib/supabase';
+// import { supabase } from '../../lib/supabase';
 import { useUser } from '../../context/UserContext';
 
 // Add more motivational quotes
@@ -145,7 +145,6 @@ const HomeScreen = () => {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [showGoalModal, setShowGoalModal] = useState(null);
   const [goalInput, setGoalInput] = useState('');
-  const [streakUpdatedToday, setStreakUpdatedToday] = useState(false);
   const [workoutCompleted, setWorkoutCompleted] = useState(stats.today_workout_completed);
   const [mentalCompleted, setMentalCompleted] = useState(stats.today_mental_completed);
 
@@ -191,8 +190,6 @@ const HomeScreen = () => {
         // Reset trackers at midnight
         addCalories(-calories.consumed);
         addWater(-water.consumed);
-        // Reset streak update flag
-        setStreakUpdatedToday(false);
       }
     };
 
@@ -214,23 +211,6 @@ const HomeScreen = () => {
       }
 
       console.log('Fetching stats for user:', userProfile.id);
-      // Get stats from profiles table
-      let { data, error } = await supabase
-        .from('profiles')
-        .select('today_workout_completed, today_mental_completed, last_streak_update')
-        .eq('profile_id', userProfile.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching stats:', error);
-        return;
-      }
-
-      console.log('Fetched stats:', data);
-      setWorkoutCompleted(data.today_workout_completed);
-      setMentalCompleted(data.today_mental_completed);
-      const today = new Date().toISOString().split('T')[0];
-      setStreakUpdatedToday(data.last_streak_update === today);
     };
     fetchStats();
   }, [userProfile]);
@@ -239,23 +219,6 @@ const HomeScreen = () => {
   useEffect(() => {
     const checkDailyReset = async () => {
       if (!userProfile?.id) return;
-
-      const today = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('last_streak_update')
-        .eq('profile_id', userProfile.id)
-        .single();
-
-      if (error) {
-        console.error('Error checking daily reset:', error);
-        return;
-      }
-
-      // If last_streak_update is not today, reset the streak update flag
-      if (data.last_streak_update !== today) {
-        setStreakUpdatedToday(false);
-      }
     };
 
     // Check every minute
@@ -300,86 +263,6 @@ const HomeScreen = () => {
     }
   };
 
-  // Update the updateStreak function to use profiles table
-  const updateStreak = async () => {
-    if (!userProfile || !userProfile.id) return;
-
-    try {
-      // Get today's date in UTC
-      const today = new Date();
-      today.setUTCHours(0, 0, 0, 0);
-      const todayStr = today.toISOString();
-
-      // Check if streak was already updated today
-      const { data: streakData } = await supabase
-        .from('betteru_streaks')
-        .select('last_completed_date')
-        .eq('profile_id', userProfile.id)
-        .single();
-
-      if (streakData?.last_completed_date) {
-        const lastUpdate = new Date(streakData.last_completed_date);
-        lastUpdate.setUTCHours(0, 0, 0, 0);
-        
-        // If streak was already updated today, don't update again
-        if (lastUpdate.getTime() === today.getTime()) {
-        return;
-      }
-      }
-
-      // Get today's workout and mental session logs
-      const { data: workoutLogs } = await supabase
-        .from('workout_logs')
-        .select('completed_at')
-        .eq('profile_id', userProfile.id)
-        .gte('completed_at', todayStr)
-        .lt('completed_at', new Date(today.getTime() + 86400000).toISOString());
-
-      const { data: mentalLogs } = await supabase
-        .from('mental_session_logs')
-        .select('completed_at')
-        .eq('profile_id', userProfile.id)
-        .gte('completed_at', todayStr)
-        .lt('completed_at', new Date(today.getTime() + 86400000).toISOString());
-
-      const hasWorkout = workoutLogs && workoutLogs.length > 0;
-      const hasMental = mentalLogs && mentalLogs.length > 0;
-
-      if (hasWorkout && hasMental) {
-        // Get current streak data
-        const { data: currentStreak } = await supabase
-          .from('betteru_streaks')
-          .select('current_streak, longest_streak')
-          .eq('profile_id', userProfile.id)
-          .single();
-
-        const newStreak = (currentStreak?.current_streak || 0) + 1;
-        const newLongestStreak = Math.max(newStreak, currentStreak?.longest_streak || 0);
-
-        // Update streak
-        const { error } = await supabase
-          .from('betteru_streaks')
-          .upsert({
-            profile_id: userProfile.id,
-            current_streak: newStreak,
-            longest_streak: newLongestStreak,
-            last_completed_date: todayStr,
-            updated_at: new Date().toISOString()
-          });
-
-        if (error) throw error;
-
-      // Update local state
-      incrementStat('streak', 1);
-      setStreakUpdatedToday(true);
-      setWorkoutCompleted(false);
-      setMentalCompleted(false);
-      }
-    } catch (error) {
-      console.error('Error updating streak:', error);
-    }
-  };
-
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: 80 }]}>
       <View style={styles.header}>
@@ -387,6 +270,12 @@ const HomeScreen = () => {
           <Text style={styles.greetingText}>Good Afternoon</Text>
           <Text style={styles.nameText}>{userProfile?.full_name || 'User'}</Text>
         </View>
+        <TouchableOpacity 
+          style={styles.profileButton}
+          onPress={() => router.push('/profile')}
+        >
+          <Ionicons name="person-circle" size={32} color="#00ffff" />
+        </TouchableOpacity>
       </View>
 
       {/* Motivational Quote Card */}
@@ -394,41 +283,6 @@ const HomeScreen = () => {
         <Text style={styles.quoteText}>"{currentQuote.text}"</Text>
         <Text style={styles.quoteAuthor}>- {currentQuote.author}</Text>
       </Animated.View>
-
-      <View style={styles.streakContainer}>
-        <View style={styles.streakContent}>
-          <Ionicons name="flame" size={24} color="#ff6b6b" />
-          <View style={styles.streakInfo}>
-            <Text style={styles.streakLabel}>BetterU Streak</Text>
-            <Text style={styles.streakValue}>{stats.streak || 0} days</Text>
-          </View>
-        </View>
-        <View style={styles.activityStatus}>
-          <View style={styles.activityItem}>
-            <Ionicons 
-              name={workoutCompleted ? "checkmark-circle" : "ellipse-outline"} 
-              size={24} 
-              color={workoutCompleted ? "#ff0000" : "#666"} 
-            />
-            <Text style={[styles.activityText, workoutCompleted && styles.activityCompleted]}>
-              Workout
-            </Text>
-          </View>
-          <View style={styles.activityItem}>
-            <Ionicons 
-              name={mentalCompleted ? "checkmark-circle" : "ellipse-outline"} 
-              size={24} 
-              color={mentalCompleted ? "#ff0000" : "#666"} 
-            />
-            <Text style={[styles.activityText, mentalCompleted && styles.activityCompleted]}>
-              Mental Session
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.streakDescription}>
-          Complete both a workout and mental session daily to maintain your streak!
-        </Text>
-      </View>
 
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
@@ -725,8 +579,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
     paddingTop: 60,
+    paddingBottom: 20,
   },
   greeting: {
     flex: 1,
@@ -739,6 +594,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  profileButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 255, 0.1)',
+    marginLeft: 10,
   },
   trackerCard: {
     backgroundColor: '#111',
@@ -990,59 +853,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 20,
-  },
-  streakContainer: {
-    backgroundColor: 'rgba(0, 200, 255, 0.10)',
-    borderRadius: 15,
-    padding: 20,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 200, 255, 0.20)',
-  },
-  streakContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  streakInfo: {
-    marginLeft: 15,
-  },
-  streakLabel: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  streakValue: {
-    fontSize: 24,
-    color: '#00e0ff',
-    fontWeight: 'bold',
-    marginTop: 4,
-    textShadowColor: '#00bfff',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
-  streakDescription: {
-    fontSize: 14,
-    color: '#00bfff',
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  activityStatus: {
-    marginTop: 15,
-    gap: 10,
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  activityText: {
-    color: '#666',
-    fontSize: 16,
-  },
-  activityCompleted: {
-    color: '#00ffff',
   },
 });
 

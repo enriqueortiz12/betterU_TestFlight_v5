@@ -197,13 +197,13 @@ function PurchaseSubscriptionScreen() {
             }
             console.log('profile_id for subscription:', authUser.id);
             const now = new Date();
-            const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+            const end = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days from now
             const { data, error } = await supabase
               .from('subscriptions')
               .upsert({
                 user_id: authUser.id,
                 profile_id: authUser.id,
-                product_id: 'mock_premium',
+                product_id: 'mock_premium_3days',
                 original_transaction_id: 'mock_transaction_' + Date.now(),
                 latest_receipt: 'mock_receipt',
                 status: 'active',
@@ -217,9 +217,10 @@ function PurchaseSubscriptionScreen() {
               .select();
             if (error) throw error;
             console.log('Mock subscription row created:', data);
-            Alert.alert('Success', 'Mock subscription created!');
+            Alert.alert('Success', 'Mock subscription created! You now have 3 days of premium access.');
             router.replace('/settings');
           } catch (err) {
+            console.error('Error creating mock subscription:', err);
             Alert.alert('Error', err.message || 'Failed to create mock subscription.');
           } finally {
             setLoading(false);
@@ -233,7 +234,7 @@ function PurchaseSubscriptionScreen() {
         >
           <View style={styles.mockPurchaseButtonContent}>
             <Ionicons name="checkmark-circle" size={24} color="#fff" style={{ marginRight: 10 }} />
-            <Text style={styles.mockPurchaseButtonText}>Mock Purchase</Text>
+            <Text style={styles.mockPurchaseButtonText}>Mock Purchase (3 Days Premium)</Text>
           </View>
         </LinearGradient>
       </TouchableOpacity>

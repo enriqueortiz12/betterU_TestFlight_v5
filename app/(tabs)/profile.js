@@ -43,7 +43,34 @@ const ProfileScreen = () => {
     { id: 'prefer_not_to_say', label: 'Prefer not to say' },
   ];
 
+  const TRAINING_LEVELS = [
+    { id: 'beginner', label: 'Beginner', description: 'New to fitness or returning after a long break' },
+    { id: 'intermediate', label: 'Intermediate', description: 'Consistent training for 6+ months' },
+    { id: 'advanced', label: 'Advanced', description: 'Experienced with 2+ years of training' },
+  ];
+
   useEffect(() => {
+    const loadProfileData = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) return;
+
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (error) throw error;
+        if (profile) {
+          updateProfile(profile);
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+      }
+    };
+
+    loadProfileData();
   }, []);
 
   const calculateBMI = (weight, height) => {
@@ -96,6 +123,12 @@ const ProfileScreen = () => {
         valueToSave = convertWeightBack(parseFloat(editValue));
       } else if (editingField === 'height') {
         valueToSave = convertHeightBack(parseFloat(editValue));
+      } else if (editingField === 'fitness_goal') {
+        // Ensure we're saving a single value, not an array
+        valueToSave = editValue;
+      } else if (editingField === 'training_level') {
+        // Ensure training level is saved as a single value
+        valueToSave = editValue;
       }
 
       const updates = { [editingField]: valueToSave };
@@ -243,6 +276,36 @@ const ProfileScreen = () => {
               </TouchableOpacity>
             </PremiumFeature>
           </View>
+        </View>
+      );
+    }
+
+    if (editingField === 'training_level') {
+      return (
+        <View style={styles.optionsGrid}>
+          {TRAINING_LEVELS.map((level) => (
+            <TouchableOpacity
+              key={level.id}
+              style={[
+                styles.optionCard,
+                editValue === level.id && styles.selectedOptionCard,
+              ]}
+              onPress={() => handleOptionSelect(level.id)}
+            >
+              <Text style={[
+                styles.optionLabel,
+                editValue === level.id && styles.selectedOptionLabel
+              ]}>
+                {level.label}
+              </Text>
+              <Text style={[
+                styles.optionDescription,
+                editValue === level.id && styles.selectedOptionDescription
+              ]}>
+                {level.description}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       );
     }
@@ -437,6 +500,21 @@ const ProfileScreen = () => {
                     {userProfile?.gender?.replace(/_/g, ' ') || 'Not set'}
                   </Text>
                   <TouchableOpacity onPress={() => handleEdit('gender', userProfile?.gender)}>
+                    <Ionicons name="create-outline" size={16} color="#00ffff" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Ionicons name="barbell-outline" size={24} color="#00ffff" />
+              <View style={styles.infoTextContainer}>
+                <Text style={styles.infoLabel}>Training Level</Text>
+                <View style={styles.infoValueRow}>
+                  <Text style={styles.infoValue}>
+                    {userProfile?.training_level?.charAt(0).toUpperCase() + userProfile?.training_level?.slice(1) || 'Not set'}
+                  </Text>
+                  <TouchableOpacity onPress={() => handleEdit('training_level', userProfile?.training_level)}>
                     <Ionicons name="create-outline" size={16} color="#00ffff" />
                   </TouchableOpacity>
                 </View>

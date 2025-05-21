@@ -29,8 +29,13 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      // Fetch using user_id to match profile screen
-      const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
+      // Fetch using id instead of user_id to match the new schema
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
       console.log("[AuthContext] Profile fetch result:", data, error);
 
       if (error) {
@@ -170,54 +175,52 @@ export const AuthProvider = ({ children }) => {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-      })
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        }
+      });
 
       if (error) {
-        console.error("Supabase signup error:", error)
-        return { error, user: null }
+        console.error("Supabase signup error:", error);
+        return { error, user: null };
       }
 
       if (data?.user) {
-        console.log("User created in Supabase:", data.user.id)
+        console.log("User created in Supabase:", data.user.id);
 
         // Set the user state immediately to trigger auth state change
-        setUser(data.user)
+        setUser(data.user);
 
-        // Create a profile for the new user
-        const { error: profileError } = await supabase.from("profiles").insert([
-          {
-            user_id: data.user.id,
+        // Create onboarding data
+        const { error: onboardingError } = await supabase
+          .from("onboarding_data")
+          .upsert({
+            id: data.user.id,
             full_name: fullName,
-            email,
-            // Add these fields to ensure they exist but are incomplete
-            age: null,
-            weight: null,
-            height: null,
-            fitness_goal: null,
-            gender: null,
-            training_level: "intermediate",
-          },
-        ])
+            email: email,
+          });
 
-        if (profileError) {
-          console.error("Error creating initial profile:", profileError)
-          return { error: profileError, user: data.user }
+        if (onboardingError) {
+          console.error("Error creating onboarding data:", onboardingError);
+          return { error: onboardingError, user: data.user };
         }
 
-        console.log("Initial profile created successfully, needs completion")
+        console.log("Onboarding data created successfully");
 
         // Fetch the profile to update the profile state
-        fetchProfile(data.user.id)
+        fetchProfile(data.user.id);
 
-        return { error: null, user: data.user }
+        return { error: null, user: data.user };
       }
 
-      return { error: new Error("No user data returned from signup"), user: null }
+      return { error: new Error("No user data returned from signup"), user: null };
     } catch (error) {
-      console.error("Signup error:", error)
-      return { error, user: null }
+      console.error("Signup error:", error);
+      return { error, user: null };
     }
-  }
+  };
 
   // Improve error handling in the AuthContext
   // Add this function to the AuthContext:
@@ -265,20 +268,24 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // Update the updateProfile function to use id instead of user_id
   const updateProfile = async (updates) => {
     if (!user) return { error: "No user logged in" }
 
     try {
-      const { error } = await supabase.from("profiles").update(updates).eq("user_id", user.id)
+      const { error } = await supabase
+        .from("profiles")
+        .update(updates)
+        .eq("id", user.id);
 
       if (!error) {
         // Update local profile state
-        setProfile((prev) => (prev ? { ...prev, ...updates } : null))
+        setProfile((prev) => (prev ? { ...prev, ...updates } : null));
       }
 
-      return { error }
+      return { error };
     } catch (error) {
-      return { error }
+      return { error };
     }
   }
 

@@ -20,44 +20,27 @@ const MentalSessionSummary = () => {
 
   const handleSave = async () => {
     try {
-      // First save the session to mental_sessions
-      const { data, error } = await supabase
-        .from('mental_sessions')
-        .insert([
-          {
-            profile_id: user.id,
-            session_type: sessionType,
-            duration: parseInt(duration),
-            calmness_level: calmnessLevel,
-            notes: notes,
-            completed_at: new Date().toISOString()
-          },
-        ]);
-
-      if (error) {
-        console.error('Error saving session:', error);
-        throw error;
-      }
-
-      // Also save to mental_session_logs
+      // Save to mental_session_logs with all details
       const { error: logError } = await supabase
         .from('mental_session_logs')
         .insert([
           {
             profile_id: user.id,
             session_type: sessionType,
+            session_name: sessionType === 'meditation' ? 'Meditation Session' : 'Breathing Exercise',
             duration: parseInt(duration),
             calmness_level: calmnessLevel,
             notes: notes,
             completed_at: new Date().toISOString()
           },
         ]);
+      
       if (logError) {
         console.error('Error saving session log:', logError);
-        // Don't throw, allow main save to succeed
+        throw logError;
       }
 
-      // Then update stats
+      // Update stats
       await incrementStat('mental_sessions');
       
       // Navigate to mental screen
@@ -126,6 +109,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
     padding: 20,
+    paddingTop: 60,
   },
   title: {
     fontSize: 24,

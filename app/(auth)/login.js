@@ -176,8 +176,26 @@ const LoginScreen = () => {
           break;
         }
 
-        console.log('Login successful, navigating...');
-        router.replace('/(tabs)/home');
+        // Check onboarding status
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('onboarding_completed')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error checking onboarding status:', profileError);
+          setError('Failed to check onboarding status');
+          Alert.alert('Error', 'Failed to check onboarding status');
+          break;
+        }
+
+        console.log('Login successful, checking onboarding status...');
+        if (!profile?.onboarding_completed) {
+          router.replace('/(auth)/onboarding/welcome');
+        } else {
+          router.replace('/(tabs)/home');
+        }
         return;
 
       } catch (error) {

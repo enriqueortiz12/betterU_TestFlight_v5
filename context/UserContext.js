@@ -85,45 +85,56 @@ export const UserProvider = ({ children, onReady }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         console.log('[UserContext] No user found during profile sync');
+        // Clear AsyncStorage when no user is found
+        await AsyncStorage.removeItem('userProfile');
         setIsLoading(false);
         return;
       }
 
-      // Fetch profile using correct key (user_id)
+      // Fetch profile using id instead of user_id
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single();
 
       if (error) {
         console.error('[UserContext] Error fetching profile from Supabase:', error);
+        // Clear AsyncStorage on error
+        await AsyncStorage.removeItem('userProfile');
         setIsLoading(false);
         return;
       }
 
       if (data) {
         console.log('[UserContext] Profile data from Supabase:', data);
-        setUserProfile(data);
+        // Only update AsyncStorage if we have valid data
         await AsyncStorage.setItem('userProfile', JSON.stringify(data));
+        setUserProfile(data);
       } else {
-        // No profile found, set empty profile
+        // No profile found, set empty profile and clear AsyncStorage
         console.log('[UserContext] No profile found, setting empty profile');
-        setUserProfile({
-          name: '',
-          age: '',
-          weight: '',
-          height: '',
+        const emptyProfile = {
+          id: user.id,
+          full_name: '',
+          email: user.email,
+          age: null,
+          weight: null,
+          height: null,
           goal: '',
-          trainingLevel: 'intermediate',
+          training_level: 'intermediate',
           fitness_goal: '',
-          gender: ''
-        });
+          gender: '',
+          onboarding_completed: false
+        };
+        setUserProfile(emptyProfile);
         await AsyncStorage.removeItem('userProfile');
       }
     } catch (err) {
       console.error('[UserContext] Error in syncProfileFromSupabase:', err);
       setInitializationError(err);
+      // Clear AsyncStorage on error
+      await AsyncStorage.removeItem('userProfile');
     } finally {
       setIsLoading(false);
     }
@@ -225,8 +236,9 @@ export const UserProvider = ({ children, onReady }) => {
       const { error } = await supabase
         .from('profiles')
         .update(newProfile)
-        .eq('user_id', user.id);
+        .eq('id', user.id);
       if (error) {
+        console.error('[UserContext] Error updating profile:', error);
         return { success: false, error: error.message };
       }
       // Update local state and AsyncStorage
@@ -235,6 +247,7 @@ export const UserProvider = ({ children, onReady }) => {
       await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
       return { success: true };
     } catch (error) {
+      console.error('[UserContext] Error in updateProfile:', error);
       return { success: false, error: error.message };
     }
   };

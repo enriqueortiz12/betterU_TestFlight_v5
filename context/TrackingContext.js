@@ -174,7 +174,7 @@ export const TrackingProvider = ({ children }) => {
   // Helper to get profile_id for the current user
   const getProfileId = async () => {
     console.log('[getProfileId] profile from AuthContext:', profile);
-    if (profile?.profile_id) return profile.profile_id;
+    if (profile?.id) return profile.id;
     console.log('No profile found in AuthContext');
     return null;
   };
@@ -200,15 +200,94 @@ export const TrackingProvider = ({ children }) => {
     let retryTimeout;
 
     const loadSavedData = async () => {
-      if (!profile?.profile_id) {
+      if (!profile?.id) {
         console.log('[TrackingContext] Profile not loaded yet, skipping loadSavedData');
         return;
       }
       try {
+        console.log('[TrackingContext] Starting to load data for profile:', profile.id);
+        setIsLoading(true);
+
         // Get today's date in UTC
         const today = new Date();
         today.setUTCHours(0, 0, 0, 0);
-        const todayStr = today.toISOString();
+        const todayStr = today.toISOString().split('T')[0];
+        console.log('[TrackingContext] Loading data for date:', todayStr);
+
+        // Load data from Supabase first
+        console.log('[TrackingContext] Fetching calorie data from Supabase...');
+        const { data: calorieData, error: calorieError } = await supabase
+          .from('calorie_tracking')
+          .select('*')
+          .eq('profile_id', profile.id)
+          .eq('date', todayStr)
+          .maybeSingle();
+
+        if (calorieError) {
+          console.error('[TrackingContext] Error loading calorie data:', calorieError);
+        } else {
+          console.log('[TrackingContext] Loaded calorie data:', calorieData);
+          if (calorieData) {
+            const newCalories = {
+              consumed: calorieData.consumed || 0,
+              goal: calorieData.goal || calories.goal || 2000 // Keep existing goal if available
+            };
+            console.log('[TrackingContext] Setting calories state to:', newCalories);
+            setCalories(newCalories);
+          } else {
+            // Create new entry if none exists, but keep existing goal
+            console.log('[TrackingContext] Creating new calorie tracking entry');
+            const { error: insertError } = await supabase
+              .from('calorie_tracking')
+              .insert({
+                profile_id: profile.id,
+                date: todayStr,
+                consumed: 0,
+                goal: calories.goal || 2000, // Keep existing goal
+                updated_at: new Date().toISOString()
+              });
+            if (insertError) {
+              console.error('[TrackingContext] Error creating calorie tracking:', insertError);
+            }
+          }
+        }
+
+        console.log('[TrackingContext] Fetching water data from Supabase...');
+        const { data: waterData, error: waterError } = await supabase
+          .from('water_tracking')
+          .select('*')
+          .eq('profile_id', profile.id)
+          .eq('date', todayStr)
+          .maybeSingle();
+
+        if (waterError) {
+          console.error('[TrackingContext] Error loading water data:', waterError);
+        } else {
+          console.log('[TrackingContext] Loaded water data:', waterData);
+          if (waterData) {
+            const newWater = {
+              consumed: (waterData.glasses || 0) * 250, // Convert glasses to ml
+              goal: waterData.goal || water.goal || 2.0 // Keep existing goal if available
+            };
+            console.log('[TrackingContext] Setting water state to:', newWater);
+            setWater(newWater);
+          } else {
+            // Create new entry if none exists, but keep existing goal
+            console.log('[TrackingContext] Creating new water tracking entry');
+            const { error: insertError } = await supabase
+              .from('water_tracking')
+              .insert({
+                profile_id: profile.id,
+                date: todayStr,
+                glasses: 0,
+                goal: water.goal || 8, // Keep existing goal
+                updated_at: new Date().toISOString()
+              });
+            if (insertError) {
+              console.error('[TrackingContext] Error creating water tracking:', insertError);
+            }
+          }
+        }
 
         // Check if we need to reset based on last reset date
         const lastResetDate = await safeAsyncStorage(() => 
@@ -219,28 +298,22 @@ export const TrackingProvider = ({ children }) => {
           const lastReset = new Date(lastResetDate);
           lastReset.setUTCHours(0, 0, 0, 0);
           
-          // If last reset was before today, reset everything
+          // If last reset was before today, reset everything except goals
           if (lastReset.getTime() < today.getTime()) {
             console.log('[TrackingContext] Resetting daily data for new day');
             
-            // Reset calories and water
-            setCalories(prev => ({ ...prev, consumed: 0 }));
-            setWater(prev => ({ ...prev, consumed: 0 }));
-            
             // Reset completion status in Supabase
-            if (profile?.profile_id) {
-              const { error } = await supabase
-                .from('profiles')
-                .update({
-                  today_workout_completed: false,
-                  today_mental_completed: false,
-                  last_reset_date: todayStr
-                })
-                .eq('profile_id', profile.profile_id);
+            const { error } = await supabase
+              .from('profiles')
+              .update({
+                today_workout_completed: false,
+                today_mental_completed: false,
+                last_reset_date: todayStr
+              })
+              .eq('profile_id', profile.id);
 
-              if (error) {
-                console.error('[TrackingContext] Error resetting completion status:', error);
-              }
+            if (error) {
+              console.error('[TrackingContext] Error resetting completion status:', error);
             }
 
             // Save reset date
@@ -248,59 +321,44 @@ export const TrackingProvider = ({ children }) => {
               AsyncStorage.setItem('lastResetDate', todayStr)
             );
 
-            // Clear AsyncStorage for calories and water
-            await safeAsyncStorage(() => AsyncStorage.setItem('calories', '0'));
-            await safeAsyncStorage(() => AsyncStorage.setItem('water', '0'));
+            // Reset calories and water in Supabase, but keep goals
+            const { error: calorieError } = await supabase
+              .from('calorie_tracking')
+              .upsert({
+                profile_id: profile.id,
+                date: todayStr,
+                consumed: 0,
+                goal: calories.goal || 2000, // Keep existing goal
+                updated_at: new Date().toISOString()
+              });
+
+            if (calorieError) {
+              console.error('[TrackingContext] Error resetting calories:', calorieError);
+            }
+
+            const { error: waterError } = await supabase
+              .from('water_tracking')
+              .upsert({
+                profile_id: profile.id,
+                date: todayStr,
+                glasses: 0,
+                goal: water.goal || 8, // Keep existing goal
+                updated_at: new Date().toISOString()
+              });
+
+            if (waterError) {
+              console.error('[TrackingContext] Error resetting water:', waterError);
+            }
+
+            // Reset local state but keep goals
+            setCalories(prev => ({ ...prev, consumed: 0 }));
+            setWater(prev => ({ ...prev, consumed: 0 }));
           }
         } else {
           // First time setup - save today as last reset date
           await safeAsyncStorage(() => 
             AsyncStorage.setItem('lastResetDate', todayStr)
           );
-        }
-
-        // Load calories and water from AsyncStorage
-        const savedCalories = await safeAsyncStorage(() => 
-          AsyncStorage.getItem('calories')
-        );
-        const savedWater = await safeAsyncStorage(() => 
-          AsyncStorage.getItem('water')
-        );
-
-        if (savedCalories) {
-          setCalories(prev => ({
-            ...prev,
-            consumed: parseInt(savedCalories)
-          }));
-        }
-
-        if (savedWater) {
-          setWater(prev => ({
-            ...prev,
-            consumed: parseInt(savedWater)
-          }));
-        }
-
-        // Load goals from AsyncStorage
-        const savedCalorieGoal = await safeAsyncStorage(() => 
-          AsyncStorage.getItem('calorieGoal')
-        );
-        const savedWaterGoal = await safeAsyncStorage(() => 
-          AsyncStorage.getItem('waterGoal')
-        );
-
-        if (savedCalorieGoal) {
-          setCalories(prev => ({
-            ...prev,
-            goal: parseInt(savedCalorieGoal)
-          }));
-        }
-
-        if (savedWaterGoal) {
-          setWater(prev => ({
-            ...prev,
-            goal: parseFloat(savedWaterGoal)
-          }));
         }
 
         // Load mood from AsyncStorage
@@ -319,15 +377,7 @@ export const TrackingProvider = ({ children }) => {
           setStats(JSON.parse(savedStats));
         }
 
-        // Load streak data from AsyncStorage
-        const savedStreakData = await safeAsyncStorage(() => 
-          AsyncStorage.getItem('streakData')
-        );
-        if (savedStreakData) {
-          setStreakData(JSON.parse(savedStreakData));
-        }
-
-        console.log('[TrackingContext] Finished loading saved data for profile:', profile.profile_id);
+        console.log('[TrackingContext] Finished loading saved data for profile:', profile.id);
         setIsLoading(false);
       } catch (error) {
         console.error('[TrackingContext] Error loading saved data:', error);
@@ -336,7 +386,14 @@ export const TrackingProvider = ({ children }) => {
     };
 
     loadSavedData();
-  }, [profile?.profile_id]);
+
+    return () => {
+      setIsMounted(false);
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+    };
+  }, [profile?.id]);
 
   // Update the checkMidnightReset function with better error handling
   useEffect(() => {
@@ -485,9 +542,9 @@ export const TrackingProvider = ({ children }) => {
         );
 
         // Update local state
-        safeSetState(setCalories, prev => ({ ...prev, consumed: 0 }));
-        safeSetState(setWater, prev => ({ ...prev, consumed: 0 }));
-        safeSetState(setStats, prev => ({
+        setCalories(prev => ({ ...prev, consumed: 0 }));
+        setWater(prev => ({ ...prev, consumed: 0 }));
+        setStats(prev => ({
           ...prev,
           today_workout_completed: false,
           today_mental_completed: false,
@@ -948,74 +1005,31 @@ export const TrackingProvider = ({ children }) => {
     try {
       if (type === 'calories') {
         const newCalories = { ...calories, goal: amount };
-        safeSetState(setCalories, newCalories);
-        await safeAsyncStorage(() => 
-          AsyncStorage.setItem('calories', JSON.stringify(newCalories))
-        );
-        await safeAsyncStorage(() => 
-          AsyncStorage.setItem('calorieGoal', amount.toString())
-        );
+        setCalories(newCalories);
       } else if (type === 'water') {
         const newWater = { ...water, goal: amount };
-        safeSetState(setWater, newWater);
-        await safeAsyncStorage(() => 
-          AsyncStorage.setItem('water', JSON.stringify(newWater))
-        );
-        await safeAsyncStorage(() => 
-          AsyncStorage.setItem('waterGoal', amount.toString())
-        );
+        setWater(newWater);
       }
 
       if (user?.id) {
-          const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toISOString().split('T')[0];
+        const profileId = await getProfileId();
         
-        // First check if entry exists
-        const { data: existingEntry, error: fetchError } = await safeDbOperation(async (profileId) =>
-          supabase
-            .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
-            .select('*')
-            .eq('profile_id', profileId)
-            .eq('date', today)
-            .maybeSingle()
-        );
-
-        if (fetchError) {
-          console.error('Error fetching tracking data:', fetchError);
-          return;
-        }
-
-        if (existingEntry) {
-          // Update existing entry
-          const { error: updateError } = await safeDbOperation(async (profileId) =>
-            supabase
-              .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
-              .update({
-                goal: amount,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', existingEntry.id)
-          );
-
-          if (updateError) {
-            console.error('Error updating goal:', updateError);
-          }
-        } else {
-          // Insert new entry
-          const { error: insertError } = await safeDbOperation(async (profileId) =>
-            supabase
-              .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
-              .insert({
-                profile_id: profileId,
-              date: today,
-                goal: amount,
-                consumed: type === 'calories' ? calories.consumed : water.consumed,
+        // Update goal in Supabase
+        const { error: updateError } = await supabase
+          .from(type === 'calories' ? 'calorie_tracking' : 'water_tracking')
+          .upsert({
+            profile_id: profileId,
+            date: today,
+            goal: amount,
+            consumed: type === 'calories' ? calories.consumed : water.consumed,
             updated_at: new Date().toISOString()
-              })
-          );
+          }, {
+            onConflict: 'profile_id,date'
+          });
 
-          if (insertError) {
-            console.error('Error inserting goal:', insertError);
-          }
+        if (updateError) {
+          console.error('Error updating goal:', updateError);
         }
       }
     } catch (error) {
@@ -1056,32 +1070,17 @@ export const TrackingProvider = ({ children }) => {
 
   const updateStats = async (newStats) => {
     try {
-      safeSetState(setStats, newStats);
-      if (newStats !== undefined && newStats !== null) {
-        await safeAsyncStorage(() => 
-          AsyncStorage.setItem('stats', JSON.stringify(newStats))
-        );
-      } else {
-        await safeAsyncStorage(() => 
-          AsyncStorage.removeItem('stats')
-        );
+      const statsToSave = typeof newStats === 'function' 
+        ? newStats(stats) 
+        : newStats;
+
+      if (!statsToSave) {
+        console.error('Invalid stats update:', newStats);
+        return;
       }
 
-      if (user?.id) {
-        const { error: updateError } = await safeDbOperation(async (profileId) =>
-          supabase
-        .from('user_stats')
-        .upsert({
-              profile_id: profileId,
-              ...newStats,
-          updated_at: new Date().toISOString()
-            })
-        );
-
-        if (updateError) {
-          console.error('Error updating stats:', updateError);
-        }
-      }
+      await AsyncStorage.setItem('stats', JSON.stringify(statsToSave));
+      setStats(statsToSave);
     } catch (error) {
       console.error('Error updating stats:', error);
     }
@@ -1117,94 +1116,158 @@ export const TrackingProvider = ({ children }) => {
   // Robust incrementStat for streak
   const incrementStat = async (statName, amount = 1) => {
     try {
-      if (!user?.id) return;
-      const profileId = await getProfileId();
-      if (!profileId) return;
-      const today = getTodayString();
-
-      // Get current stats
-      const { data: currentStats, error: fetchError } = await supabase
-        .from('user_stats')
-        .select('*')
-        .eq('profile_id', profileId)
-        .maybeSingle();
-      if (fetchError) {
-        console.error('Error fetching current stats:', fetchError);
-        return;
-      }
-
-      // Update the specific stat
-      const newValue = (currentStats?.[statName] || 0) + amount;
-      const updateData = {
-        [statName]: newValue,
-        today_workout_completed: statName === 'workouts' ? true : currentStats?.today_workout_completed,
-        today_mental_completed: statName === 'mental_sessions' ? true : currentStats?.today_mental_completed,
-        updated_at: new Date().toISOString()
+      const currentStats = await AsyncStorage.getItem('stats');
+      const stats = currentStats ? JSON.parse(currentStats) : {
+        workouts: 0,
+        minutes: 0,
+        calories: 0,
+        water: 0,
+        today_workout_completed: false
       };
 
-      // Update the stats in Supabase
-      const { error: updateError } = await supabase
-        .from('user_stats')
-        .update(updateData)
-        .eq('profile_id', profileId);
-      if (updateError) {
-        console.error('Error updating stats:', updateError);
-        return;
-      }
-
-      // Update local state for today_mental_completed
-      if (statName === 'mental_sessions') {
-        setStats(prev => ({
-          ...prev,
-          today_mental_completed: true,
-          mental_sessions: newValue
-        }));
-      } else if (statName === 'workouts') {
-        setStats(prev => ({
-          ...prev,
-          today_workout_completed: true,
-          workouts: newValue
-        }));
-      }
-
-      // Only increment streak if both activities are completed and not already incremented today
-      if (updateData.today_workout_completed && updateData.today_mental_completed) {
-        // Fetch streak row
-        const { data: streakRow, error: streakFetchError } = await supabase
-          .from('betteru_streaks')
-          .select('*')
-          .eq('profile_id', profileId)
-          .maybeSingle();
-        if (streakFetchError) {
-          console.error('[incrementStat] Error fetching streak row:', streakFetchError);
-          return;
-        }
-        if (streakRow?.last_completed_date === today) {
-          console.log('[incrementStat] Streak already incremented today, skipping.');
-        } else {
-          // Increment streak
-          const newStreak = (streakRow?.current_streak || 0) + 1;
-          const newLongest = Math.max(newStreak, streakRow?.longest_streak || 0);
-          const { error: streakUpdateError } = await supabase
-            .from('betteru_streaks')
-            .upsert({
-              profile_id: profileId,
-              current_streak: newStreak,
-              longest_streak: newLongest,
-              last_completed_date: today,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'profile_id' });
-          if (streakUpdateError) {
-            console.error('[incrementStat] Error updating streak:', streakUpdateError);
-          } else {
-            console.log('[incrementStat] Streak incremented to', newStreak);
-          }
-        }
-      }
-      // Always fetch latest streak after update
-      await fetchStreak();
+      stats[statName] = (stats[statName] || 0) + amount;
+      await AsyncStorage.setItem('stats', JSON.stringify(stats));
+      setStats(stats);
     } catch (error) {
       console.error('Error incrementing stat:', error);
+    }
+  };
+
+  const finishWorkout = async (workoutId, duration) => {
+    try {
+      const userId = await getProfileId();
+      if (!userId) {
+        console.log('[finishWorkout] No user ID found');
+        return { success: false, error: 'No user ID found' };
+      }
+
+      console.log('[finishWorkout] Starting with user ID:', userId);
+
+      // Add retry logic for database operations
+      const maxRetries = 3;
+      let retryCount = 0;
+      let success = false;
+
+      while (retryCount < maxRetries && !success) {
+        try {
+          // First, ensure user_stats entry exists
+          const { data: existingStats, error: fetchError } = await supabase
+            .from('user_stats')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          if (fetchError) {
+            console.error(`[finishWorkout] Error fetching stats (attempt ${retryCount + 1}):`, fetchError);
+            throw fetchError;
+          }
+
+          // If no stats exist, create them
+          if (!existingStats) {
+            const { error: insertError } = await supabase
+              .from('user_stats')
+              .insert({
+                user_id: userId,
+                workouts_completed: 1,
+                total_workout_minutes: duration,
+                today_workout_completed: true,
+                current_streak: 1,
+                longest_streak: 1,
+                last_reset_date: new Date().toISOString().split('T')[0]
+              });
+
+            if (insertError) {
+              console.error(`[finishWorkout] Error creating stats (attempt ${retryCount + 1}):`, insertError);
+              throw insertError;
+            }
+          } else {
+            // Update existing stats
+            const { data: statsData, error: statsError } = await supabase
+              .from('user_stats')
+              .update({
+                workouts_completed: existingStats.workouts_completed + 1,
+                total_workout_minutes: existingStats.total_workout_minutes + duration,
+                today_workout_completed: true,
+                current_streak: existingStats.current_streak + 1,
+                longest_streak: Math.max(existingStats.current_streak + 1, existingStats.longest_streak),
+                last_reset_date: new Date().toISOString().split('T')[0]
+              })
+              .eq('user_id', userId)
+              .select()
+              .single();
+
+            if (statsError) {
+              console.error(`[finishWorkout] Error updating stats (attempt ${retryCount + 1}):`, statsError);
+              throw statsError;
+            }
+
+            console.log('[finishWorkout] Stats updated successfully:', statsData);
+          }
+
+          // Update workout_logs
+          const { data: logData, error: logError } = await supabase
+            .from('workout_logs')
+            .update({
+              completed: true,
+              completed_at: new Date().toISOString()
+            })
+            .eq('id', workoutId)
+            .select()
+            .single();
+
+          if (logError) {
+            console.error(`[finishWorkout] Error updating workout log (attempt ${retryCount + 1}):`, logError);
+            throw logError;
+          }
+
+          console.log('[finishWorkout] Workout log updated successfully:', logData);
+
+          // Update local state
+          setWorkoutLogs(prevLogs => 
+            prevLogs.map(log => 
+              log.id === workoutId 
+                ? { ...log, completed: true, completed_at: new Date().toISOString() }
+                : log
+            )
+          );
+
+          // Update stats in local state
+          setStats(prevStats => ({
+            ...prevStats,
+            workouts: (prevStats.workouts || 0) + 1,
+            minutes: (prevStats.minutes || 0) + Math.floor(duration / 60),
+            workouts_completed: (prevStats.workouts_completed || 0) + 1,
+            total_workout_minutes: (prevStats.total_workout_minutes || 0) + duration,
+            today_workout_completed: true,
+            current_streak: (prevStats.current_streak || 0) + 1,
+            longest_streak: Math.max((prevStats.current_streak || 0) + 1, prevStats.longest_streak || 0)
+          }));
+
+          // Also update AsyncStorage
+          const currentStats = await AsyncStorage.getItem('stats');
+          const stats = currentStats ? JSON.parse(currentStats) : {};
+          const newStats = {
+            ...stats,
+            workouts: (stats.workouts || 0) + 1,
+            minutes: (stats.minutes || 0) + Math.floor(duration / 60),
+            today_workout_completed: true
+          };
+          await AsyncStorage.setItem('stats', JSON.stringify(newStats));
+
+          success = true;
+          return { success: true, data: { log: logData } };
+        } catch (error) {
+          retryCount++;
+          if (retryCount === maxRetries) {
+            throw error;
+          }
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+        }
+      }
+    } catch (error) {
+      console.error('[finishWorkout] Error after all retries:', error);
+      return { success: false, error };
     }
   };
 

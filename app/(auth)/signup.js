@@ -57,60 +57,75 @@ const SignupScreen = () => {
     setError("");
 
     try {
+      // 1. Create user in Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            full_name: fullName,
-          },
+          data: { full_name: fullName }
         }
       });
 
       if (error) {
-        setError(error.message);
-        Alert.alert("Error", error.message);
-      } else if (data?.user) {
-        try {
-          // Create onboarding data
-          const { error: onboardingError } = await supabase
-            .from("onboarding_data")
-            .upsert({
-              id: data.user.id,
-              full_name: fullName,
-              email: email,
-            });
-
-          if (onboardingError) {
-            console.error("Error creating onboarding data:", onboardingError);
-            Alert.alert("Error", "Failed to start onboarding process");
-            return;
-          }
-
-          // If we have a session immediately after signup
-          if (data.session) {
-            Alert.alert(
-              "Account Created",
-              "Your account has been created successfully. Let's complete your profile!",
-              [{ text: "Continue", onPress: () => router.push("/(auth)/onboarding/age-weight") }]
-            );
-          } else {
-            // If email confirmation is required
-            Alert.alert(
-              "Account Created",
-              "Please check your email for confirmation. Once confirmed, you can log in to continue.",
-              [{ text: "Go to Login", onPress: () => router.push("/(auth)/login") }]
-            );
-          }
-        } catch (error) {
-          console.error("Error in signup process:", error);
-          Alert.alert("Error", "An unexpected error occurred during signup");
+        console.error("Signup error:", error);
+        if (error.message.includes("8 seconds")) {
+          setError("Please wait a moment before trying again");
+          Alert.alert("Error", "Please wait a moment before trying again");
+        } else {
+          setError(error.message);
+          Alert.alert("Error", error.message);
         }
+        setIsLoading(false);
+        return;
       }
+
+      const userId = data?.user?.id;
+      if (!userId) {
+        setError("No user ID returned from Supabase Auth");
+        Alert.alert("Error", "No user ID returned from Supabase Auth");
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Create initial profile with onboarding_completed set to false
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert({
+          id: userId,
+          full_name: fullName,
+          email: email,
+          onboarding_completed: false,
+          training_level: "beginner"
+        });
+
+      if (profileError) {
+        console.error("Profile creation error:", profileError);
+        // Don't return here as the user is already created
+      }
+
+      // 3. Create initial onboarding data
+      const { error: onboardingError } = await supabase
+        .from("onboarding_data")
+        .insert({
+          id: userId,
+          full_name: fullName,
+          email: email,
+        });
+
+      if (onboardingError) {
+        console.error("Onboarding data creation error:", onboardingError);
+        // Don't return here as the user is already created
+      }
+
+      Alert.alert(
+        "Account Created",
+        "Your account has been created successfully. Please check your email for verification.",
+        [{ text: "Go to Login", onPress: () => router.push("/(auth)/login") }]
+      );
     } catch (error) {
+      console.error("Unexpected error:", error);
       setError("An unexpected error occurred");
-      Alert.alert("Error", "An unexpected error occurred");
-      console.error(error);
+      Alert.alert("Error", "An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }

@@ -179,7 +179,7 @@ const ActiveMentalSession = () => {
         });
       }, 1000);
     } else if (timeLeft === 0) {
-      handleSessionComplete();
+      handleFinishSession();
     }
     return () => clearInterval(interval);
   }, [isActive, timeLeft]);
@@ -214,54 +214,6 @@ const ActiveMentalSession = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Save session to Supabase
-  const handleSessionComplete = async () => {
-    if (!user) {
-      console.error('No user found');
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('mental_session_logs')
-        .insert({
-          profile_id: user.id,
-          session_name: session.title,
-          session_type: session.session_type,
-          duration: session.duration,
-          completed_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
-
-      // Update today_mental_completed in user_stats
-      await supabase
-        .from('user_stats')
-        .update({
-          today_mental_completed: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('profile_id', user.id);
-
-      // Update session state
-      setIsActive(false);
-      await incrementStat('mental_sessions');
-
-      // Show success message
-      Alert.alert(
-        'Session Completed',
-        'Your mental session has been saved successfully!',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
-    } catch (error) {
-      console.error('Error saving mental session:', error);
-      Alert.alert(
-        'Error',
-        'Failed to save your mental session. Please try again.'
-      );
-    }
-  };
-
   // Save and go to summary
   const handleFinishSession = async () => {
     if (!user) {
@@ -269,34 +221,16 @@ const ActiveMentalSession = () => {
       return;
     }
 
-    try {
-      // Update today_mental_completed in user_stats
-      await supabase
-        .from('user_stats')
-        .update({
-          today_mental_completed: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('profile_id', user.id);
+    setIsActive(false);
 
-      setIsActive(false);
-      await incrementStat('mental_sessions');
-
-      // Navigate to summary
-      router.push({
-        pathname: '/mental-session-summary',
-        params: {
-          sessionType: session.session_type || 'meditation',
-          duration: session.duration,
-        },
-      });
-    } catch (error) {
-      console.error('Error finishing mental session:', error);
-      Alert.alert(
-        'Error',
-        'Failed to finish your mental session. Please try again.'
-      );
-    }
+    // Navigate to summary
+    router.push({
+      pathname: '/mental-session-summary',
+      params: {
+        sessionType: session.session_type || 'meditation',
+        duration: session.duration,
+      },
+    });
   };
 
   // Replay audio from the beginning

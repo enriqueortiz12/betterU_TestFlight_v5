@@ -19,7 +19,7 @@
       }
     },
     "production": {
-      "autoIncrement": true,
+      "autoIncrement": false,
       "distribution": "store",
       "ios": {
         "resourceClass": "m-medium",

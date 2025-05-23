@@ -113,4 +113,58 @@ export const useUnits = () => {
     throw new Error('useUnits must be used within a UnitsProvider');
   }
   return context;
-}; 
+};
+
+const updateSettings = async (newSettings) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return { success: false, error: 'No user session' };
+
+      console.log('Updating settings for user:', session.user.id);
+      console.log('New settings:', newSettings);
+
+      // First check if settings exist
+      const { data: existingSettings, error: checkError } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      let result;
+      if (checkError && checkError.code === 'PGRST116') {
+        // Settings don't exist, create them
+        result = await supabase
+          .from('user_settings')
+          .insert({
+            id: session.user.id,
+            use_imperial: newSettings.use_imperial ?? false,
+            calorie_goal: 2000,
+            water_goal_ml: 2000,
+            daily_reminders: true,
+            rest_time_seconds: 90
+          })
+          .select()
+          .single();
+      } else {
+        // Settings exist, update them
+        result = await supabase
+          .from('user_settings')
+          .update(newSettings)
+          .eq('id', session.user.id)
+          .select()
+          .single();
+      }
+
+      if (result.error) {
+        console.error('Error updating settings:', result.error);
+        return { success: false, error: result.error };
+      }
+
+      // Update local state with the returned data
+      setSettings(result.data);
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Error updating units in Supabase:', error);
+      return { success: false, error };
+    }
+  }; 

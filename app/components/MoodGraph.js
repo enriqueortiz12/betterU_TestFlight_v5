@@ -38,6 +38,12 @@ const MoodStreakBar = ({ moodHistory = [] }) => {
     return entry ? entry.mood : null;
   });
 
+  console.log('Mood streak data:', {
+    last7Days,
+    moodHistory,
+    streak
+  });
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>7-Day Mood Streak</Text>

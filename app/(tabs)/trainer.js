@@ -201,13 +201,18 @@ const TrainerScreen = () => {
               <TextInput
                 style={styles.input}
                 value={input}
-                onChangeText={setInput}
-                placeholder="Ask your AI trainer..."
+                onChangeText={(text) => {
+                  if (text.length <= 100) {
+                    setInput(text);
+                  }
+                }}
+                placeholder="Ask your AI trainer... (100 chars max)"
                 placeholderTextColor="#00ffff99"
                 editable={!loading && !isLoading && messageCount < MAX_DAILY_MESSAGES}
                 onSubmitEditing={handleSendMessage}
                 returnKeyType="send"
                 multiline
+                maxLength={100}
                 maxHeight={100}
               />
               <TouchableOpacity
@@ -388,8 +393,8 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
   },
   userMessageText: {
     color: '#000',

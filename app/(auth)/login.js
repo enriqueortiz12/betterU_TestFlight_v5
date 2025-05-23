@@ -194,7 +194,7 @@ const LoginScreen = () => {
         if (!profile?.onboarding_completed) {
           router.replace('/(auth)/onboarding/welcome');
         } else {
-          router.replace('/(tabs)/home');
+        router.replace('/(tabs)/home');
         }
         return;
 

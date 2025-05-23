@@ -54,15 +54,15 @@ export default function TabLayout() {
         <Tabs.Screen
           name="workout-summary"
           options={{
-            href: null,
-          }}
-        />
+              href: null,
+            }}
+          />
         <Tabs.Screen
           name="settings"
           options={{
             href: null,
             presentation: 'modal',
-          }}
+        }}
         />
         <Tabs.Screen
           name="profile"

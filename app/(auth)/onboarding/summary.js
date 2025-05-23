@@ -48,32 +48,45 @@ export default function SummaryScreen() {
         return;
       }
 
-      // Fetch both onboarding data and profile data
-      const [onboardingResponse, profileResponse] = await Promise.all([
-        supabase
-          .from('onboarding_data')
-          .select('*')
-          .eq('id', session.user.id)
-          .single(),
-        supabase
-          .from('profiles')
-          .select('training_level, full_name, email')
-          .eq('id', session.user.id)
-          .single()
-      ]);
+      // Get user metadata from auth
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
 
-      if (onboardingResponse.error) throw onboardingResponse.error;
-      
-      // Combine the data
-      setOnboardingData({
-        ...onboardingResponse.data,
-        training_level: profileResponse.data?.training_level,
-        full_name: profileResponse.data?.full_name || onboardingResponse.data?.full_name,
-        email: profileResponse.data?.email || onboardingResponse.data?.email
-      });
+      // Fetch onboarding data
+      const { data: onboardingData, error: onboardingError } = await supabase
+        .from('onboarding_data')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      // Handle PGRST116 error silently (no rows found)
+      if (onboardingError && onboardingError.code !== 'PGRST116') {
+        throw onboardingError;
+      }
+
+      // Combine the data, using auth data as fallback
+      const combinedData = {
+        ...onboardingData,
+        id: session.user.id,
+        full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
+        email: user.email,
+        training_level: onboardingData?.training_level || 'beginner',
+        age: onboardingData?.age,
+        weight: onboardingData?.weight,
+        height: onboardingData?.height,
+        fitness_goals: onboardingData?.fitness_goals,
+        gender: onboardingData?.gender,
+        username: onboardingData?.username
+      };
+
+      console.log('Combined data:', combinedData);
+      setOnboardingData(combinedData);
     } catch (error) {
-      console.error('Error fetching onboarding data:', error);
-      setError('Failed to load your data');
+      console.error('Error fetching data:', error);
+      // Only show error if it's not a PGRST116 error
+      if (error.code !== 'PGRST116') {
+        setError('Failed to load your data. Please try again.');
+      }
     }
   };
 
@@ -87,9 +100,11 @@ export default function SummaryScreen() {
         ? onboardingData.fitness_goals[0] 
         : onboardingData.fitness_goals;
 
+      // Create new profile
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: onboardingData.id,
           full_name: onboardingData.full_name,
           email: onboardingData.email,
           age: onboardingData.age,
@@ -97,9 +112,13 @@ export default function SummaryScreen() {
           height: onboardingData.height,
           fitness_goal: fitnessGoal,
           gender: onboardingData.gender,
+          username: onboardingData.username,
+          training_level: onboardingData.training_level,
+          bio: onboardingData.bio || "",
           onboarding_completed: true
-        })
-        .eq('id', onboardingData.id);
+        }, {
+          onConflict: 'id'
+        });
 
       if (profileError) throw profileError;
 
@@ -151,8 +170,16 @@ export default function SummaryScreen() {
               <View style={styles.infoRow}>
                 <Ionicons name="person-outline" size={24} color="#00ffff" />
                 <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoLabel}>Name</Text>
+                  <Text style={styles.infoLabel}>Full Name</Text>
                   <Text style={styles.infoValue}>{onboardingData.full_name}</Text>
+                </View>
+              </View>
+
+              <View style={styles.infoRow}>
+                <Ionicons name="at-outline" size={24} color="#00ffff" />
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoLabel}>Username</Text>
+                  <Text style={styles.infoValue}>{onboardingData.username}</Text>
                 </View>
               </View>
 
@@ -213,6 +240,14 @@ export default function SummaryScreen() {
                 <View style={styles.infoTextContainer}>
                   <Text style={styles.infoLabel}>Gender</Text>
                   <Text style={styles.infoValue}>{onboardingData.gender}</Text>
+                </View>
+              </View>
+
+              <View style={styles.infoRow}>
+                <Ionicons name="document-text-outline" size={24} color="#00ffff" />
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoLabel}>Bio</Text>
+                  <Text style={styles.infoValue}>{onboardingData.bio || 'No bio yet'}</Text>
                 </View>
               </View>
 

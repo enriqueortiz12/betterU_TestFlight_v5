@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../lib/supabase";
 import { LogoImage } from "../../utils/imageUtils";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width, height } = Dimensions.get("window");
 const isIphoneX = Platform.OS === "ios" && (height >= 812 || width >= 812);
@@ -57,78 +58,37 @@ const SignupScreen = () => {
     setError("");
 
     try {
-      // 1. Create user in Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
-        password,
-        options: {
-          data: { full_name: fullName }
-        }
+        password
       });
 
       if (error) {
-        console.error("Signup error:", error);
-        if (error.message.includes("8 seconds")) {
-          setError("Please wait a moment before trying again");
-          Alert.alert("Error", "Please wait a moment before trying again");
-        } else {
-          setError(error.message);
-          Alert.alert("Error", error.message);
-        }
+        console.error("Auth error:", error);
+        setError(error.message);
+        Alert.alert("Error", error.message);
         setIsLoading(false);
         return;
       }
 
-      const userId = data?.user?.id;
-      if (!userId) {
-        setError("No user ID returned from Supabase Auth");
-        Alert.alert("Error", "No user ID returned from Supabase Auth");
+      if (!data?.user) {
+        setError("Failed to create user");
+        Alert.alert("Error", "Failed to create user. Please try again.");
         setIsLoading(false);
         return;
-      }
-
-      // 2. Create initial profile with onboarding_completed set to false
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .insert({
-          id: userId,
-          full_name: fullName,
-          email: email,
-          onboarding_completed: false,
-          training_level: "beginner"
-        });
-
-      if (profileError) {
-        console.error("Profile creation error:", profileError);
-        // Don't return here as the user is already created
-      }
-
-      // 3. Create initial onboarding data
-      const { error: onboardingError } = await supabase
-        .from("onboarding_data")
-        .insert({
-          id: userId,
-          full_name: fullName,
-          email: email,
-        });
-
-      if (onboardingError) {
-        console.error("Onboarding data creation error:", onboardingError);
-        // Don't return here as the user is already created
       }
 
       Alert.alert(
         "Account Created",
-        "Your account has been created successfully. Please check your email for verification.",
+        "Your account has been created successfully!",
         [{ text: "Go to Login", onPress: () => router.push("/(auth)/login") }]
       );
     } catch (error) {
       console.error("Unexpected error:", error);
       setError("An unexpected error occurred");
       Alert.alert("Error", "An unexpected error occurred. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
 
   return (

@@ -155,6 +155,7 @@ export const TrainerProvider = ({ children }) => {
             allTimeMentalHistory: trackingData.mentalHistory,
             prs: trackingData.personalRecords,
             goals: userProfile?.fitness_goal || stats?.goal || '',
+            bio: userProfile?.bio || '',
             mood,
           },
           systemPrompt

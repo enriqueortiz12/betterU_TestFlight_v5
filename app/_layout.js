@@ -105,11 +105,11 @@ export default function RootLayout() {
           setContextsReady(true);
         }}>
           <SettingsProvider>
-            <UnitsProvider>
-              <TrackingProvider>
-                <Slot />
-              </TrackingProvider>
-            </UnitsProvider>
+          <UnitsProvider>
+            <TrackingProvider>
+              <Slot />
+            </TrackingProvider>
+          </UnitsProvider>
           </SettingsProvider>
         </UserProvider>
       </AuthProvider>

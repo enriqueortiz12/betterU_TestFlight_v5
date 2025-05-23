@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useUser } from '../../context/UserContext';
+import { generateWorkout } from '../../utils/aiUtils';
 
 const WorkoutScreen = () => {
   const router = useRouter();
@@ -14,6 +15,7 @@ const WorkoutScreen = () => {
   const [monthlyWorkouts, setMonthlyWorkouts] = useState(0);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [userWorkouts, setUserWorkouts] = useState([]);
+  const [dailyWorkoutsGenerated, setDailyWorkoutsGenerated] = useState(0);
   const { isPremium } = useUser();
 
   const fetchWorkoutLogs = async () => {
@@ -110,6 +112,29 @@ const WorkoutScreen = () => {
     }, [])
   );
 
+  useEffect(() => {
+    fetchDailyWorkoutCount();
+  }, []);
+
+  const fetchDailyWorkoutCount = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: stats, error } = await supabase
+        .from('user_stats')
+        .select('daily_workouts_generated')
+        .eq('id', user.id)
+        .single();
+
+      if (!error && stats) {
+        setDailyWorkoutsGenerated(stats.daily_workouts_generated || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching daily workout count:', error);
+    }
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -186,6 +211,142 @@ const WorkoutScreen = () => {
         workout: JSON.stringify(workout)
       }
     });
+  };
+
+  const handleGenerateWorkout = async () => {
+    if (!isPremium) {
+      Alert.alert(
+        'Premium Feature',
+        'Upgrade to Premium to generate custom workouts!',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Check daily limit
+    if (dailyWorkoutsGenerated >= 2) {
+      Alert.alert(
+        'Daily Limit Reached',
+        'You have reached your daily limit of 2 workout generations. Please try again tomorrow.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    try {
+      // Show prompt input
+      Alert.prompt(
+        'Customize Your Workout',
+        `Enter a brief description of the workout you want (max 100 characters):\n\nDaily workouts generated: ${dailyWorkoutsGenerated}/2`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Generate',
+            onPress: async (prompt) => {
+              if (!prompt) {
+                Alert.alert('Error', 'Please enter a description for your workout');
+                return;
+              }
+
+              if (prompt.length > 100) {
+                Alert.alert('Error', 'Description must be less than 100 characters');
+                return;
+              }
+
+              // Show loading state
+              Alert.alert(
+                'Generating Workout',
+                'Please wait while we create your personalized workout...',
+                [{ text: 'OK' }]
+              );
+
+              // Get user profile data
+              const { data: { user } } = await supabase.auth.getUser();
+              if (!user) {
+                Alert.alert('Error', 'Please log in to generate workouts');
+                return;
+              }
+
+              // Get profile data
+              const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+              if (profileError || !profile) {
+                console.error('Error getting profile:', profileError);
+                Alert.alert('Error', 'Failed to get user profile');
+                return;
+              }
+
+              // Generate the workout
+              const result = await generateWorkout({
+                training_level: profile?.training_level || 'beginner',
+                fitness_goal: profile?.fitness_goal || 'general fitness',
+                age: profile?.age,
+                weight: profile?.weight,
+                height: profile?.height,
+                gender: profile?.gender,
+                bio: profile?.bio || '',
+                custom_prompt: prompt
+              });
+
+              if (!result.success) {
+                Alert.alert('Error', result.error || 'Failed to generate workout');
+                return;
+              }
+
+              // Save the generated workout
+              const { error: saveError } = await supabase
+                .from('workouts')
+                .insert({
+                  profile_id: user.id,
+                  workout_name: result.workout.name,
+                  exercises: result.workout.exercises,
+                  created_at: new Date().toISOString()
+                });
+
+              if (saveError) {
+                console.error('Error saving workout:', saveError);
+                Alert.alert('Error', 'Failed to save workout');
+                return;
+              }
+
+              // Increment daily workout count
+              const { error: updateError } = await supabase
+                .from('user_stats')
+                .update({
+                  daily_workouts_generated: dailyWorkoutsGenerated + 1
+                })
+                .eq('id', user.id);
+
+              if (updateError) {
+                console.error('Error updating daily workout count:', updateError);
+              } else {
+                setDailyWorkoutsGenerated(prev => prev + 1);
+              }
+
+              // Refresh the workouts list
+              fetchUserWorkouts();
+
+              Alert.alert(
+                'Success',
+                'Your personalized workout has been generated!',
+                [{ text: 'OK' }]
+              );
+            }
+          }
+        ],
+        'plain-text'
+      );
+    } catch (error) {
+      console.error('Error generating workout:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    }
   };
 
   const premiumWorkouts = [
@@ -345,7 +506,7 @@ const WorkoutScreen = () => {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }}>
       <View style={styles.header}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.title}>Workouts</Text>
+        <Text style={styles.title}>Workouts</Text>
           <TouchableOpacity 
             style={styles.createWorkoutButton}
             onPress={() => setShowLogs(true)}
@@ -369,7 +530,7 @@ const WorkoutScreen = () => {
       {/* Quick Actions */}
       <View style={styles.quickActions}>
         <View style={{ position: 'relative' }}>
-          <TouchableOpacity 
+      <TouchableOpacity 
             style={[styles.actionButton, !isPremium && styles.disabledButton]}
             onPress={() => {
               if (!isPremium) {
@@ -386,7 +547,7 @@ const WorkoutScreen = () => {
           >
             <Ionicons name="add-circle-outline" size={24} color="#00ffff" />
             <Text style={styles.actionButtonText}>Create Workout</Text>
-          </TouchableOpacity>
+      </TouchableOpacity>
           {!isPremium && (
             <View style={styles.lockOverlay}>
               <Ionicons name="lock-closed" size={28} color="#fff" style={{ opacity: 0.85 }} />
@@ -396,26 +557,16 @@ const WorkoutScreen = () => {
         <View style={{ position: 'relative' }}>
           <TouchableOpacity 
             style={[styles.actionButton, !isPremium && styles.disabledButton]}
-            onPress={() => {
-              if (!isPremium) {
-                Alert.alert(
-                  'Premium Feature',
-                  'Upgrade to Premium to generate custom workouts!',
-                  [{ text: 'OK' }]
-                );
-                return;
-              }
-              // TODO: Implement workout generation
-              Alert.alert(
-                'Coming Soon',
-                'Workout generation will be available in the next update!',
-                [{ text: 'OK' }]
-              );
-            }}
+            onPress={handleGenerateWorkout}
             disabled={!isPremium}
           >
             <Ionicons name="sparkles-outline" size={24} color="#00ffff" />
             <Text style={styles.actionButtonText}>Generate Workout</Text>
+            {isPremium && (
+              <View style={styles.counterContainer}>
+                <Text style={styles.counterText}>{dailyWorkoutsGenerated}/2</Text>
+              </View>
+            )}
           </TouchableOpacity>
           {!isPremium && (
             <View style={styles.lockOverlay}>
@@ -428,7 +579,7 @@ const WorkoutScreen = () => {
       {/* User's Custom Workouts */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Your Workouts</Text>
+        <Text style={styles.sectionTitle}>Your Workouts</Text>
         </View>
         {userWorkouts.length === 0 ? (
           <Text style={styles.emptyText}>No custom workouts yet.</Text>
@@ -474,7 +625,7 @@ const WorkoutScreen = () => {
       {/* Workout Types */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Workout Types</Text>
+        <Text style={styles.sectionTitle}>Workout Types</Text>
           <TouchableOpacity 
             style={styles.createWorkoutButton}
             onPress={() => router.push('/training-plans')}
@@ -757,6 +908,12 @@ const WorkoutScreen = () => {
                     <Text key={i} style={styles.exercisesList}>• {ex}</Text>
                   ))}
                 </View>
+                {workout.howTo && (
+                  <View style={styles.howToSection}>
+                    <Text style={styles.howToTitle}>How to:</Text>
+                    <Text style={styles.howToText}>{workout.howTo}</Text>
+                  </View>
+                )}
               </View>
               <TouchableOpacity style={styles.startButton} onPress={() => startWorkout(workout)}>
                 <Text style={styles.startButtonText}>Start Workout</Text>
@@ -785,6 +942,12 @@ const WorkoutScreen = () => {
                   <Text key={i} style={styles.exercisesList}>• {ex}</Text>
                 ))}
               </View>
+              {workout.howTo && (
+                <View style={styles.howToSection}>
+                  <Text style={styles.howToTitle}>How to:</Text>
+                  <Text style={styles.howToText}>{workout.howTo}</Text>
+                </View>
+              )}
               <View style={{ alignItems: 'center', marginTop: 10 }}>
                 <Text style={{ color: '#ff4444', fontWeight: 'bold', fontSize: 14 }}>Upgrade to Premium to start these workouts</Text>
               </View>
@@ -1198,6 +1361,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
+  },
+  howToSection: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: 'rgba(0, 255, 255, 0.05)',
+    borderRadius: 10,
+  },
+  howToTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#00ffff',
+    marginBottom: 5,
+  },
+  howToText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  counterContainer: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#00ffff',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#000',
+  },
+  counterText: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
 

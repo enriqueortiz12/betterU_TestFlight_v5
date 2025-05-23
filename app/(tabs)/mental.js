@@ -120,7 +120,7 @@ const moodOptions = [
 const MentalScreen = () => {
   const router = useRouter();
   const { user } = useAuth();
-  const { updateMood, incrementStat } = useTracking();
+  const { updateMood, incrementStat, mood } = useTracking();
   const [showMoodModal, setShowMoodModal] = useState(false);
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -149,7 +149,7 @@ const MentalScreen = () => {
         .eq('profile_id', user.id)
         .gte('date', sevenDaysAgo.toISOString())
         .lte('date', now.toISOString())
-        .order('date', { ascending: false });
+        .order('date', { ascending: true });
 
       if (error) throw error;
 
@@ -162,7 +162,13 @@ const MentalScreen = () => {
         }
       });
 
-      setMoodHistory(Object.values(latestMoods));
+      // Convert to array and sort by date
+      const sortedMoods = Object.values(latestMoods).sort((a, b) => 
+        new Date(a.date) - new Date(b.date)
+      );
+
+      console.log('Fetched mood history:', sortedMoods);
+      setMoodHistory(sortedMoods);
     } catch (error) {
       console.error('Error fetching mood history:', error);
     }
@@ -173,47 +179,24 @@ const MentalScreen = () => {
       if (!user) return;
 
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
 
-      // Check if mood already exists for today
-      const { data: existingMoods, error: fetchError } = await supabase
+      // Always insert a new mood entry
+      const { error: insertError } = await supabase
         .from('mood_tracking')
-        .select('*')
-        .eq('profile_id', user.id)
-        .gte('date', today)
-        .lt('date', new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString())
-        .order('date', { ascending: false });
+        .insert({
+          profile_id: user.id,
+          mood: mood,
+          date: now.toISOString()
+        });
 
-      if (fetchError) throw fetchError;
+      if (insertError) throw insertError;
 
-      let error;
-      if (existingMoods && existingMoods.length > 0) {
-        // Update the most recent mood for today
-        const { error: updateError } = await supabase
-          .from('mood_tracking')
-          .update({ 
-            mood: mood,
-            date: now.toISOString()
-          })
-          .eq('id', existingMoods[0].id);
-        error = updateError;
-      } else {
-        // Insert new mood
-        const { error: insertError } = await supabase
-          .from('mood_tracking')
-          .insert({
-            profile_id: user.id,
-            mood: mood,
-            date: now.toISOString()
-          });
-        error = insertError;
-      }
-
-      if (error) throw error;
-
-      // Fetch updated mood history
-      await fetchMoodHistory();
+      // Update local state and AsyncStorage
       await updateMood(mood);
+      
+      // Fetch updated mood history immediately
+      await fetchMoodHistory();
+      
       setShowMoodModal(false);
       Alert.alert('Mood Updated', `You're feeling ${mood} today. Taking care of your mental health is important!`);
     } catch (error) {
@@ -286,12 +269,12 @@ const MentalScreen = () => {
       const { error: logError } = await supabase
         .from('mental_session_logs')
         .insert({
-          profile_id: user.id,
+            profile_id: user.id,
           session_name: sessionData.type === 'meditation' ? 'Meditation Session' : 'Breathing Exercise',
           session_type: sessionData.type,
-          duration: sessionData.duration,
-          calmness_level: sessionData.calmnessLevel,
-          notes: sessionData.notes,
+            duration: sessionData.duration,
+            calmness_level: sessionData.calmnessLevel,
+            notes: sessionData.notes,
           completed_at: new Date().toISOString()
         });
 
@@ -433,6 +416,13 @@ const MentalScreen = () => {
       }
     });
   };
+
+  // Add useEffect to refresh mood history when mood changes
+  useEffect(() => {
+    if (mood) {
+      fetchMoodHistory();
+    }
+  }, [mood]);
 
   if (showSummary) {
     return (

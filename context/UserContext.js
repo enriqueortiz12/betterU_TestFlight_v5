@@ -26,7 +26,8 @@ export const UserProvider = ({ children, onReady }) => {
     goal: "",
     trainingLevel: "intermediate",
     fitness_goal: "",
-    gender: ""
+    gender: "",
+    bio: ""
   })
 
   const [isLoading, setIsLoading] = useState(true)
@@ -85,55 +86,96 @@ export const UserProvider = ({ children, onReady }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         console.log('[UserContext] No user found during profile sync');
-        // Clear AsyncStorage when no user is found
         await AsyncStorage.removeItem('userProfile');
         setIsLoading(false);
         return;
       }
 
-      // Fetch profile using id instead of user_id
-      const { data, error } = await supabase
+      // First try to get the profile
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
-      if (error) {
-        console.error('[UserContext] Error fetching profile from Supabase:', error);
-        // Clear AsyncStorage on error
-        await AsyncStorage.removeItem('userProfile');
-        setIsLoading(false);
-        return;
+      if (profileError) {
+        console.log('Profile fetch result:', profile, profileError);
+        
+        if (profileError.code === 'PGRST116') {
+          // Profile doesn't exist, initialize it
+          const { error: initError } = await supabase.rpc('initialize_existing_user', { user_id: user.id });
+          
+          if (initError) {
+            console.error('Error initializing user data:', initError);
+            throw initError;
+          }
+          
+          // Try fetching again
+          const { data: newProfile, error: newProfileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+            
+          if (newProfileError) {
+            console.error('Error fetching profile after initialization:', newProfileError);
+            throw newProfileError;
+          }
+          
+          // Initialize profile data
+          await supabase.rpc('initialize_profile_data', { user_id: user.id });
+          
+          // Fetch one more time to get the updated data
+          const { data: finalProfile, error: finalError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+            
+          if (finalError) {
+            throw finalError;
+          }
+          
+          await AsyncStorage.setItem('userProfile', JSON.stringify(finalProfile));
+          setUserProfile(finalProfile);
+          return;
+        }
+        
+        throw profileError;
       }
 
-      if (data) {
-        console.log('[UserContext] Profile data from Supabase:', data);
-        // Only update AsyncStorage if we have valid data
-        await AsyncStorage.setItem('userProfile', JSON.stringify(data));
-        setUserProfile(data);
-      } else {
-        // No profile found, set empty profile and clear AsyncStorage
-        console.log('[UserContext] No profile found, setting empty profile');
-        const emptyProfile = {
-          id: user.id,
-          full_name: '',
-          email: user.email,
-          age: null,
-          weight: null,
-          height: null,
-          goal: '',
-          training_level: 'intermediate',
-          fitness_goal: '',
-          gender: '',
-          onboarding_completed: false
-        };
-        setUserProfile(emptyProfile);
-        await AsyncStorage.removeItem('userProfile');
+      if (profile) {
+        console.log('[UserContext] Profile data from Supabase:', profile);
+        // Check if the profile has completed onboarding
+        const hasCompletedOnboarding = profile.onboarding_completed === true;
+        console.log('[UserContext] Onboarding status:', hasCompletedOnboarding);
+        
+        // If onboarding is completed, ensure we don't reset it
+        if (hasCompletedOnboarding) {
+          await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
+          setUserProfile(profile);
+        } else {
+          // If onboarding is not completed, initialize the profile
+          await supabase.rpc('initialize_profile_data', { user_id: user.id });
+          
+          // Fetch the updated profile
+          const { data: updatedProfile, error: fetchError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+            
+          if (fetchError) {
+            throw fetchError;
+          }
+          
+          await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+          setUserProfile(updatedProfile);
+        }
       }
     } catch (err) {
       console.error('[UserContext] Error in syncProfileFromSupabase:', err);
       setInitializationError(err);
-      // Clear AsyncStorage on error
       await AsyncStorage.removeItem('userProfile');
     } finally {
       setIsLoading(false);
@@ -225,30 +267,41 @@ export const UserProvider = ({ children, onReady }) => {
   }, [onReady]);
 
   // Save profile changes to Supabase and local state
-  const updateProfile = async (newProfile) => {
+  const updateProfile = async (updates) => {
     try {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         return { success: false, error: 'No user logged in' };
       }
+
       // Update Supabase
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .update(newProfile)
-        .eq('id', user.id);
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      // Check for errors
       if (error) {
         console.error('[UserContext] Error updating profile:', error);
         return { success: false, error: error.message };
       }
-      // Update local state and AsyncStorage
-      const updatedProfile = { ...userProfile, ...newProfile };
-      setUserProfile(updatedProfile);
-      await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
-      return { success: true };
-    } catch (error) {
-      console.error('[UserContext] Error in updateProfile:', error);
-      return { success: false, error: error.message };
+
+      // If successful, update local state
+      if (data) {
+        const updatedProfile = { ...userProfile, ...updates };
+        setUserProfile(updatedProfile);
+        await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+        return { success: true, data };
+      }
+
+      // If no data returned
+      return { success: false, error: 'No data returned from update' };
+    } catch (err) {
+      console.error('[UserContext] Error in updateProfile:', err);
+      return { success: false, error: err.message || 'An error occurred' };
     }
   };
 
@@ -324,4 +377,52 @@ export const useUser = () => {
 }
 
 export default { UserProvider, useUser }
+
+const fetchProfile = async (userId) => {
+    try {
+      console.log('Fetching profile for user:', userId);
+      
+      // First try to get the profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) {
+        console.log('Profile fetch result:', profile, profileError);
+        
+        if (profileError.code === 'PGRST116') {
+          // Profile doesn't exist, initialize it
+          const { error: initError } = await supabase.rpc('initialize_existing_user', { user_id: userId });
+          
+          if (initError) {
+            console.error('Error initializing user data:', initError);
+            throw initError;
+          }
+          
+          // Try fetching again
+          const { data: newProfile, error: newProfileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+            
+          if (newProfileError) {
+            console.error('Error fetching profile after initialization:', newProfileError);
+            throw newProfileError;
+          }
+          
+          return newProfile;
+        }
+        
+        throw profileError;
+      }
+
+      return profile;
+    } catch (error) {
+      console.error('[UserContext] Error fetching profile from Supabase:', error);
+      throw error;
+    }
+  };
 

@@ -9,6 +9,7 @@ import { useUnits } from '../../context/UnitsContext';
 import { useTracking } from '../../context/TrackingContext';
 import { supabase } from '../../lib/supabase';
 import PremiumFeature from '../components/PremiumFeature';
+import { useAuth } from '../../context/AuthContext';
 
 const ProfileScreen = () => {
   const { userProfile, isLoading, updateProfile } = useUser();
@@ -28,6 +29,7 @@ const ProfileScreen = () => {
   const [editValue, setEditValue] = useState('');
   const [showUnitsModal, setShowUnitsModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const { user, signOut } = useAuth();
 
   const GOALS = [
     { id: 'athleticism', label: 'Athleticism', description: 'Enhance overall athletic performance' },
@@ -50,28 +52,34 @@ const ProfileScreen = () => {
   ];
 
   useEffect(() => {
-    const loadProfileData = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user?.id) return;
+    if (user) {
+      fetchProfile();
+    }
+  }, [user]);
 
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+  const fetchProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-        if (error) throw error;
-        if (profile) {
-          updateProfile(profile);
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No profile found, redirect to onboarding
+          router.replace('/(auth)/onboarding/welcome');
+          return;
         }
-      } catch (error) {
-        console.error('Error loading profile:', error);
+        throw error;
       }
-    };
 
-    loadProfileData();
-  }, []);
+      updateProfile(data);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      Alert.alert('Error', 'Failed to load profile');
+    }
+  };
 
   const calculateBMI = (weight, height) => {
     if (!weight || !height) return null;
@@ -240,6 +248,22 @@ const ProfileScreen = () => {
   const renderGoalSettings = () => null;
 
   const renderEditContent = () => {
+    if (editingField === 'bio') {
+      return (
+        <TextInput
+          style={[styles.modalInput, styles.bioInput]}
+          value={editValue}
+          onChangeText={setEditValue}
+          placeholder="Tell us about yourself..."
+          placeholderTextColor="#666"
+          multiline={true}
+          numberOfLines={4}
+          textAlignVertical="top"
+          maxLength={100}
+        />
+      );
+    }
+
     if (editingField === 'calorie_goal' || editingField === 'water_goal') {
       return (
         <View style={styles.editContainer}>
@@ -407,6 +431,16 @@ const ProfileScreen = () => {
     );
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      Alert.alert('Error', 'Failed to sign out');
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -432,11 +466,26 @@ const ProfileScreen = () => {
           <View style={styles.avatarContainer}>
             <Ionicons name="person-circle" size={80} color="#00ffff" />
           </View>
-          <Text style={styles.name}>{userProfile?.full_name || 'User'}</Text>
-          <TouchableOpacity onPress={() => handleEdit('full_name', userProfile?.full_name)} style={{ position: 'absolute', right: 0, top: 10 }}>
-            <Ionicons name="create-outline" size={20} color="#00ffff" />
-          </TouchableOpacity>
+          <View style={styles.nameContainer}>
+            <Text style={styles.name}>{userProfile?.full_name || 'User'}</Text>
+            <TouchableOpacity 
+              style={styles.editIconButton}
+              onPress={() => handleEdit('full_name', userProfile?.full_name)}
+            >
+              <Ionicons name="create-outline" size={16} color="#00ffff" />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.email}>{userProfile?.email}</Text>
+          <Text style={styles.username}>@{userProfile?.username || '--'}</Text>
+          <View style={styles.bioContainer}>
+            <Text style={styles.bio}>{userProfile?.bio || 'No bio yet'}</Text>
+            <TouchableOpacity 
+              style={styles.editIconButton}
+              onPress={() => handleEdit('bio', userProfile?.bio)}
+            >
+              <Ionicons name="create-outline" size={16} color="#00ffff" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.statsContainer}>
@@ -542,6 +591,7 @@ const ProfileScreen = () => {
           <Ionicons name="settings-outline" size={20} color="#fff" />
           <Text style={styles.settingsButtonText}>Settings</Text>
         </TouchableOpacity>
+
       </ScrollView>
 
       {editingField && (
@@ -596,6 +646,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+    paddingBottom: 100,
   },
   header: {
     alignItems: 'center',
@@ -614,15 +665,44 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 10,
   },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 5,
+    marginRight: 10,
+  },
+  editIconButton: {
+    padding: 5,
   },
   email: {
     fontSize: 16,
     color: '#888',
+    marginBottom: 4,
+  },
+  username: {
+    fontSize: 16,
+    color: '#00ffff',
+    opacity: 0.8,
+  },
+  bioContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  bio: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    lineHeight: 20,
+    fontStyle: 'italic',
+    marginRight: 8,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -950,6 +1030,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  profileSection: {
+    marginBottom: 20,
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  profileTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  profileValue: {
+    fontSize: 16,
+    color: '#fff',
+  },
+  bioInput: {
+    height: 120,
+    textAlignVertical: 'top',
+    paddingTop: 10,
   },
 });
 

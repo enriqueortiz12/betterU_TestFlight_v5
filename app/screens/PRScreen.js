@@ -471,79 +471,79 @@ const PRScreen = () => {
 
   const renderPRCard = (pr) => {
     return (
-      <View key={pr.id} style={styles.prCard}>
-        <LinearGradient
-          colors={['#111', '#000']}
-          style={styles.prCardGradient}
-        >
-          <View style={styles.prContent}>
-            <View style={styles.prHeader}>
-              <Text style={styles.prExercise}>{pr.exercise}</Text>
-              <View style={styles.prActions}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => startEditing(pr)}
-                >
-                  <Ionicons name="pencil" size={20} color="#00ffff" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => handleDeletePress(pr)}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#ff4444" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.prStats}>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Current</Text>
-                <Text style={styles.statValue}>
-                  {pr.current_value} {getWeightUnit()}
-                </Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Target</Text>
-                <Text style={styles.statValue}>
-                  {pr.target_value} {getWeightUnit()}
-                </Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Progress</Text>
-                <Text style={styles.statValue}>
-                  {formatPercentage(calculateProgress(pr.current_value, pr.target_value))}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.progressBarContainer}>
-              <LinearGradient
-                colors={['#00ffff', '#0088ff']}
-                style={[
-                  styles.progressFill,
-                  { 
-                    width: `${calculateProgress(pr.current_value, pr.target_value)}%`
-                  }
-                ]}
-              />
-            </View>
-
-            <View style={styles.cardFooter}>
-              <Text style={styles.estimatedTime}>
-                Est. completion: {calculateETA(pr.current_value, pr.target_value)}
-              </Text>
+    <View key={pr.id} style={styles.prCard}>
+      <LinearGradient
+        colors={['#111', '#000']}
+        style={styles.prCardGradient}
+      >
+        <View style={styles.prContent}>
+          <View style={styles.prHeader}>
+            <Text style={styles.prExercise}>{pr.exercise}</Text>
+            <View style={styles.prActions}>
               <TouchableOpacity
-                style={styles.detailsButton}
-                onPress={() => handleViewProgress(pr)}
+                style={styles.actionButton}
+                onPress={() => startEditing(pr)}
               >
-                <Text style={styles.detailsButtonText}>Details</Text>
-                <Ionicons name="chevron-forward" size={16} color="#00ffff" />
+                <Ionicons name="pencil" size={20} color="#00ffff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleDeletePress(pr)}
+              >
+                <Ionicons name="trash-outline" size={20} color="#ff4444" />
               </TouchableOpacity>
             </View>
           </View>
-        </LinearGradient>
-      </View>
-    );
+
+          <View style={styles.prStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Current</Text>
+              <Text style={styles.statValue}>
+                  {pr.current_value} {getWeightUnit()}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Target</Text>
+              <Text style={styles.statValue}>
+                  {pr.target_value} {getWeightUnit()}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Progress</Text>
+              <Text style={styles.statValue}>
+                  {formatPercentage(calculateProgress(pr.current_value, pr.target_value))}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.progressBarContainer}>
+            <LinearGradient
+              colors={['#00ffff', '#0088ff']}
+              style={[
+                styles.progressFill,
+                { 
+                    width: `${calculateProgress(pr.current_value, pr.target_value)}%`
+                }
+              ]}
+            />
+          </View>
+
+          <View style={styles.cardFooter}>
+            <Text style={styles.estimatedTime}>
+                Est. completion: {calculateETA(pr.current_value, pr.target_value)}
+            </Text>
+            <TouchableOpacity
+              style={styles.detailsButton}
+                onPress={() => handleViewProgress(pr)}
+            >
+              <Text style={styles.detailsButtonText}>Details</Text>
+              <Ionicons name="chevron-forward" size={16} color="#00ffff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </LinearGradient>
+    </View>
+  );
   };
 
   const renderWeightPicker = (visible, onClose, value, onSelect, title) => (

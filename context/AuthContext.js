@@ -11,6 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null)
   const [session, setSession] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isOnboardingComplete, setIsOnboardingComplete] = useState(false)
 
   // PROFILE FETCH REMOVED: Commented out all profile fetching and logging
   /*
@@ -18,39 +19,28 @@ export const AuthProvider = ({ children }) => {
   */
 
   // Update the fetchProfile function to properly handle RLS
-  const fetchProfile = useCallback(async (userId) => {
+  const fetchProfile = async (userId) => {
     try {
-      console.log("[AuthContext] Fetching profile with userId:", userId);
-
-      if (!userId) {
-        console.error("[AuthContext] No user ID provided to fetchProfile");
-        setProfile(null);
-        setIsLoading(false);
-        return;
-      }
-
-      // Fetch using id instead of user_id to match the new schema
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
         .single();
 
-      console.log("[AuthContext] Profile fetch result:", data, error);
-
       if (error) {
-        console.error("[AuthContext] Error fetching profile:", error);
-        setProfile(null);
-      } else {
-        setProfile(data);
+        if (error.code === 'PGRST116') {
+          // Profile doesn't exist yet, this is expected during onboarding
+          return null;
+        }
+        throw error;
       }
+
+      return profile;
     } catch (error) {
-      console.error("[AuthContext] Exception in fetchProfile:", error);
-      setProfile(null);
-    } finally {
-      setIsLoading(false);
+      console.error('[AuthContext] Error fetching profile:', error);
+      return null;
     }
-  }, []);
+  };
 
   // Add a function to create an initial profile
   const createInitialProfile = async (userId) => {
@@ -85,49 +75,30 @@ export const AuthProvider = ({ children }) => {
 
   // Update the auth state change handler
   useEffect(() => {
-    console.log("AuthContext: Setting up auth state listeners")
-
     let mounted = true;
+    let subscription = null;
 
     const initializeAuth = async () => {
       try {
-        // Get initial session with retry logic
-        let retryCount = 0;
-        const maxRetries = 3;
-        
-        while (retryCount < maxRetries) {
-          try {
+        // Get initial session
             const { data: { session } } = await supabase.auth.getSession();
             if (mounted) {
-              console.log("AuthContext: Initial session check:", session?.user?.id);
               setSession(session);
               setUser(session?.user ?? null);
               if (session?.user?.id) {
-                await fetchProfile(session.user.id);
-              }
-            }
-            break;
-          } catch (error) {
-            console.error(`Error getting initial session (attempt ${retryCount + 1}/${maxRetries}):`, error);
-            retryCount++;
-            if (retryCount === maxRetries) {
+            const profile = await fetchProfile(session.user.id);
               if (mounted) {
-                setSession(null);
-                setUser(null);
+              setProfile(profile);
               }
-            } else {
-              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-            }
           }
+          setIsLoading(false);
         }
       } catch (error) {
         console.error("AuthContext: Error in initializeAuth:", error);
         if (mounted) {
           setSession(null);
           setUser(null);
-        }
-      } finally {
-        if (mounted) {
+          setProfile(null);
           setIsLoading(false);
         }
       }
@@ -136,19 +107,18 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
 
     // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return;
-      
-      console.log("AuthContext: Auth state changed:", _event, session?.user?.id);
       
       try {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user?.id) {
-          await fetchProfile(session.user.id);
+          const profile = await fetchProfile(session.user.id);
+          if (mounted) {
+            setProfile(profile);
+          }
         } else {
           setProfile(null);
         }
@@ -161,12 +131,15 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
+    subscription = authSubscription;
+
     return () => {
-      console.log("AuthContext: Cleaning up auth state listeners");
       mounted = false;
+      if (subscription) {
       subscription.unsubscribe();
+      }
     };
-  }, [fetchProfile]);
+  }, []); // Remove fetchProfile from dependencies
 
   // Update the signUp function to better handle the auth state:
 
@@ -193,7 +166,7 @@ export const AuthProvider = ({ children }) => {
         // Set the user state immediately to trigger auth state change
         setUser(data.user);
 
-        // Create onboarding data
+        // Create onboarding data with full_name from auth metadata
         const { error: onboardingError } = await supabase
           .from("onboarding_data")
           .upsert({
@@ -342,12 +315,60 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const checkOnboardingStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsOnboardingComplete(false);
+        return;
+      }
+
+      // First check if profile exists
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id);
+
+      if (profileError) {
+        console.error('Error checking profile:', profileError);
+        setIsOnboardingComplete(false);
+        return;
+      }
+
+      // If no profile exists, treat as not onboarded
+      if (!profiles || profiles.length === 0) {
+        console.log('No profile found, treating as not onboarded');
+        setIsOnboardingComplete(false);
+        return;
+      }
+
+      // If we have a profile, check its onboarding status
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error checking onboarding status:', error);
+        setIsOnboardingComplete(false);
+        return;
+      }
+
+      setIsOnboardingComplete(!!profile.onboarding_completed);
+    } catch (error) {
+      console.error('Error checking onboarding status:', error);
+      setIsOnboardingComplete(false);
+    }
+  };
+
   // Include refetchProfile in the value object
   const value = {
     user,
     profile,
     session,
     isLoading,
+    isOnboardingComplete,
     signUp,
     signIn,
     signOut,
@@ -356,6 +377,7 @@ export const AuthProvider = ({ children }) => {
     updatePassword,
     refetchProfile,
     clearUserData,
+    checkOnboardingStatus,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

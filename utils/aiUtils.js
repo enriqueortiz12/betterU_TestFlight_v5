@@ -65,7 +65,7 @@ export const generateAIResponse = async (userMessage, userData = {}, systemPromp
     const payload = {
       model: "gpt-3.5-turbo",
       messages: [
-        systemPrompt ? { role: "system", content: systemPrompt } : { role: "system", content: "You are an AI fitness trainer assistant. You provide helpful, encouraging, and accurate advice about workouts, nutrition, and fitness goals. Keep your responses concise (under 150 words) and focused on fitness advice. Always maintain context from previous messages in the conversation." },
+        systemPrompt ? { role: "system", content: systemPrompt } : { role: "system", content: "You are an AI fitness trainer assistant. You provide helpful, encouraging, and accurate advice about workouts, nutrition, and fitness goals. Keep your responses concise and focused on fitness advice. Always maintain context from previous messages in the conversation." },
         contextMessage ? { role: "system", content: contextMessage } : null,
         ...conversationMessages,
         { role: "user", content: userMessage },
@@ -117,5 +117,109 @@ export const generateAIResponse = async (userMessage, userData = {}, systemPromp
       success: true,
       response: "I'm here to help with your fitness journey! What would you like to know?"
     }
+  }
+};
+
+/**
+ * Generates a personalized workout using the OpenAI API
+ * @param {object} userData - The user's profile data (training level, goals, etc)
+ * @returns {Promise<{success: boolean, workout?: object, error?: string}>} - The result object
+ */
+export const generateWorkout = async (userData = {}) => {
+  console.log("[AI] Generating workout for user:", userData);
+
+  try {
+    // Get the API key
+    const key = await getOpenAIApiKey();
+    if (!key) {
+      console.log("[AI] No API key available for workout generation");
+      return {
+        success: false,
+        error: "API key not available"
+      };
+    }
+
+    // Create a system prompt for workout generation
+    const systemPrompt = `You are an expert fitness trainer creating personalized workouts. 
+    Create a workout based on the user's profile data and their specific request. 
+    The workout should include:
+    - A name
+    - A list of 5-6 exercises
+    - For each exercise: name, target muscles, instructions, and sets/reps
+    - Format the response as a JSON object with this exact structure:
+    {
+      "name": "Workout Name",
+      "exercises": [
+        {
+          "name": "Exercise Name",
+          "target_muscles": "Target Muscles",
+          "instructions": "Exercise Instructions",
+          "sets": 3,
+          "reps": "8-12"
+        }
+      ]
+    }
+    - Keep exercises appropriate for the user's training level
+    - Focus on the user's fitness goals
+    - Return ONLY the JSON object, no other text`;
+
+    // Prepare the request payload
+    const payload = {
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Generate a workout for this user profile: ${JSON.stringify(userData)}. The user specifically wants: ${userData.custom_prompt}` }
+      ],
+      max_tokens: 1000,
+      temperature: 0.7,
+    };
+
+    // Make the API call
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[AI] Workout generation failed:", errorText);
+      return {
+        success: false,
+        error: "Failed to generate workout"
+      };
+    }
+
+    const data = await response.json();
+    if (!data.choices || !data.choices[0]?.message?.content) {
+      return {
+        success: false,
+        error: "Invalid response from AI"
+      };
+    }
+
+    // Parse the workout data from the response
+    try {
+      const workoutData = JSON.parse(data.choices[0].message.content);
+      return {
+        success: true,
+        workout: workoutData
+      };
+    } catch (parseError) {
+      console.error("[AI] Failed to parse workout data:", parseError);
+      return {
+        success: false,
+        error: "Failed to parse workout data"
+      };
+    }
+  } catch (error) {
+    console.error("[AI] Error in generateWorkout:", error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 };

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,11 @@ import {
   SafeAreaView,
   ScrollView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useUser } from '../../../context/UserContext';
 import { supabase } from '../../../lib/supabase';
 
 const trainingLevels = [
@@ -35,43 +37,42 @@ const trainingLevels = [
 
 export default function TrainingLevelScreen() {
   const [selectedLevel, setSelectedLevel] = useState('beginner');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { updateProfile } = useUser();
 
   const handleNext = async () => {
-    if (isLoading) return;
-    
     try {
-      setIsLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) {
-        router.replace('/(auth)/login');
+      console.log('Saving training level:', selectedLevel);
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Error', 'No user logged in');
         return;
       }
 
-      console.log('Saving training level...');
-      const { error: updateError } = await supabase
-        .from('profiles')
+      // Update onboarding_data
+      const { data: onboardingData, error: onboardingDataError } = await supabase
+        .from('onboarding_data')
         .update({
-          training_level: selectedLevel
+          training_level: selectedLevel,
+          onboarding_completed: true
         })
-        .eq('id', session.user.id);
+        .eq('id', user.id)
+        .select()
+        .single();
 
-      if (updateError) {
-        console.error('Error saving training level:', updateError);
-        setError('Failed to save training level. Please try again.');
-        setIsLoading(false);
+      if (onboardingDataError) {
+        console.error('Error updating onboarding data:', onboardingDataError);
+        Alert.alert('Error', 'Failed to save your profile. Please try again.');
         return;
       }
 
-      console.log('Training level saved successfully, navigating to age-weight...');
-      // Use a direct navigation approach
-      router.push('/(auth)/onboarding/age-weight');
-    } catch (error) {
-      console.error('Error in handleNext:', error);
-      setError('An unexpected error occurred. Please try again.');
-      setIsLoading(false);
+      // Navigate to username screen
+      router.push('/(auth)/onboarding/username');
+    } catch (err) {
+      console.error('Error in handleNext:', err);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     }
   };
 
@@ -123,15 +124,11 @@ export default function TrainingLevelScreen() {
             ))}
           </View>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
           <TouchableOpacity
-            style={[styles.button, isLoading && styles.buttonDisabled]}
+            style={styles.nextButton}
             onPress={handleNext}
-            disabled={isLoading}
           >
-            <Text style={styles.buttonText}>{isLoading ? 'Saving...' : 'Continue'}</Text>
-            {!isLoading && <Ionicons name="arrow-forward" size={20} color="#000" style={styles.buttonIcon} />}
+            <Text style={styles.nextButtonText}>Continue</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -202,12 +199,7 @@ const styles = StyleSheet.create({
   selectedText: {
     color: '#000000',
   },
-  error: {
-    color: '#FF6B6B',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  button: {
+  nextButton: {
     backgroundColor: '#00ffff',
     padding: 15,
     borderRadius: 10,
@@ -216,7 +208,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 'auto',
   },
-  buttonText: {
+  nextButtonText: {
     color: '#000000',
     fontSize: 16,
     fontWeight: 'bold',

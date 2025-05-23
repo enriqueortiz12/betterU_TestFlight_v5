@@ -221,16 +221,16 @@ const ActiveMentalSession = () => {
       return;
     }
 
-    setIsActive(false);
+      setIsActive(false);
 
-    // Navigate to summary
-    router.push({
-      pathname: '/mental-session-summary',
-      params: {
-        sessionType: session.session_type || 'meditation',
-        duration: session.duration,
-      },
-    });
+      // Navigate to summary
+      router.push({
+        pathname: '/mental-session-summary',
+        params: {
+          sessionType: session.session_type || 'meditation',
+          duration: session.duration,
+        },
+      });
   };
 
   // Replay audio from the beginning

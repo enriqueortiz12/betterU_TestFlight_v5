@@ -1892,8 +1892,8 @@ const ActiveWorkoutScreen = () => {
               let found = null;
               for (const workout of Object.values(workoutData)) {
                 if (workout.exercises) {
-                  found = workout.exercises.find(e => e.name && e.name.toLowerCase() === ex.toLowerCase());
-                  if (found) break;
+                found = workout.exercises.find(e => e.name && e.name.toLowerCase() === ex.toLowerCase());
+                if (found) break;
                 }
               }
               // If found, use that exercise's data
@@ -1972,8 +1972,8 @@ const ActiveWorkoutScreen = () => {
       timer = setInterval(() => {
         setCurrentRestTime(prev => {
           if (prev <= 1) {
-            setRestTimerActive(false);
-            setShowRestTimer(false);
+      setRestTimerActive(false);
+      setShowRestTimer(false);
             return 0;
           }
           return prev - 1;
@@ -2160,110 +2160,52 @@ const ActiveWorkoutScreen = () => {
         });
       });
 
-      // Function to retry database operations
-      const retryOperation = async (operation, maxRetries = 3) => {
-        for (let i = 0; i < maxRetries; i++) {
-          try {
-            return await operation();
-          } catch (error) {
-            if (i === maxRetries - 1) throw error;
-            // Wait before retrying (exponential backoff)
-            await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
-          }
-        }
-      };
+      // Save workout log
+      const { error } = await supabase
+        .from('user_workout_logs')
+        .insert({
+          user_id: user.id,
+          workout_name: workout.workout_name || workout.name,
+          exercises: workout.exercises.map(exercise => ({
+            name: exercise.name,
+            targetMuscles: exercise.targetMuscles || [],
+            sets: exercise.sets.map(set => ({
+              weight: set.weight || 0,
+              reps: set.reps || 0,
+              completed: set.completed || false
+            }))
+          })),
+          completed_sets: completedSets,
+          exercise_count: workout.exercises.length,
+          exercise_names: workout.exercises.map(ex => ex.name),
+          total_weight: Math.round(totalWeight),
+          duration: elapsedTime,
+          completed_at: new Date().toISOString()
+        });
 
-      // Update or create stats with retry
-      await retryOperation(async () => {
-        const { data: existingStats } = await supabase
-          .from('user_stats')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
+      if (error) {
+        console.error('Error saving workout:', error);
+        Alert.alert(
+          'Error',
+          'Failed to save your workout. Please try again.'
+        );
+        return;
+      }
 
-        if (existingStats) {
-          const { error: statsError } = await supabase
-            .from('user_stats')
-            .update({
-              workouts_completed: (existingStats.workouts_completed || 0) + 1,
-              total_workout_minutes: (existingStats.total_workout_minutes || 0) + Math.floor(elapsedTime / 60),
-              today_workout_completed: true,
-              updated_at: new Date().toISOString()
-            })
-            .eq('user_id', user.id);
-
-          if (statsError) throw statsError;
-        } else {
-          const { error: statsError } = await supabase
-            .from('user_stats')
-            .insert({
-              user_id: user.id,
-              workouts_completed: 1,
-              total_workout_minutes: Math.floor(elapsedTime / 60),
-              today_workout_completed: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-
-          if (statsError) throw statsError;
-        }
-      });
-
-      // Save workout log with retry
-      await retryOperation(async () => {
-        const { error } = await supabase
-          .from('user_workout_logs')
-          .insert({
-            user_id: user.id,
-            workout_name: workout.workout_name || workout.name,
-            exercises: workout.exercises.map(exercise => ({
-              name: exercise.name,
-              targetMuscles: exercise.targetMuscles || [],
-              sets: exercise.sets.map(set => ({
-                weight: set.weight || 0,
-                reps: set.reps || 0,
-                completed: set.completed || false
-              }))
-            })),
-            completed_sets: completedSets,
-            exercise_count: workout.exercises.length,
-            exercise_names: workout.exercises.map(ex => ex.name),
-            total_weight: Math.round(totalWeight),
-            duration: elapsedTime,
-            completed_at: new Date().toISOString()
-          });
-
-        if (error) throw error;
-      });
-
-      // Update tracking stats with retry
-      const minutesWorked = Math.floor(elapsedTime / 60);
-      
-      // Update local state first
+      // Update local stats
       await updateStats(prev => ({
         ...prev,
         workouts: (prev.workouts || 0) + 1,
-        minutes: (prev.minutes || 0) + minutesWorked,
+        minutes: (prev.minutes || 0) + Math.floor(elapsedTime / 60),
         today_workout_completed: true
       }));
-
-      // Then update AsyncStorage
-      const currentStats = await AsyncStorage.getItem('stats');
-      const stats = currentStats ? JSON.parse(currentStats) : {};
-      const newStats = {
-        ...stats,
-        workouts: (stats.workouts || 0) + 1,
-        minutes: (stats.minutes || 0) + minutesWorked,
-        today_workout_completed: true
-      };
-      await AsyncStorage.setItem('stats', JSON.stringify(newStats));
 
       // Reset workout and hide confirmation
       resetWorkout();
       setShowFinishConfirmation(false);
       
       // Navigate to summary with stats
-      router.push({
+      router.replace({
         pathname: '/(tabs)/workout-summary',
         params: {
           duration: elapsedTime,
@@ -2277,8 +2219,8 @@ const ActiveWorkoutScreen = () => {
     } catch (error) {
       console.error('Error finishing workout:', error);
       Alert.alert(
-        'Connection Error',
-        'There was a problem saving your workout. Please check your internet connection and try again.',
+        'Error',
+        'There was a problem saving your workout. Please try again.',
         [{ text: 'OK', onPress: () => setShowFinishConfirmation(false) }]
       );
     }
@@ -2549,15 +2491,22 @@ const ActiveWorkoutScreen = () => {
               <Text style={styles.targetMusclesText}>{currentExercise?.targetMuscles}</Text>
               
               <Text style={styles.instructionsTitle}>Instructions:</Text>
-              {(currentExercise?.instructions && currentExercise.instructions.length > 0)
-                ? currentExercise.instructions.map((instruction, index) => (
-                <View key={index} style={styles.instructionStep}>
-                  <Text style={styles.stepNumber}>{index + 1}.</Text>
-                  <Text style={styles.instructionText}>{instruction}</Text>
-                </View>
+              {currentExercise?.instructions ? (
+                typeof currentExercise.instructions === 'string' ? (
+                  <Text style={styles.instructionText}>{currentExercise.instructions}</Text>
+                ) : Array.isArray(currentExercise.instructions) ? (
+                  currentExercise.instructions.map((instruction, index) => (
+                    <View key={index} style={styles.instructionStep}>
+                      <Text style={styles.stepNumber}>{index + 1}.</Text>
+                      <Text style={styles.instructionText}>{instruction}</Text>
+                    </View>
                   ))
-                : <Text style={styles.instructionText}>No instructions available.</Text>
-              }
+                ) : (
+                  <Text style={styles.instructionText}>No instructions available.</Text>
+                )
+              ) : (
+                <Text style={styles.instructionText}>No instructions available.</Text>
+              )}
             </View>
           </View>
         </View>

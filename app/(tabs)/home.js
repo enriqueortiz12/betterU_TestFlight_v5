@@ -1,6 +1,6 @@
 "use client";
 
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Animated, Alert, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useTracking, forceDailyReset } from '../../context/TrackingContext';
@@ -9,6 +9,9 @@ import { useState, useEffect, useRef } from 'react';
 import PremiumFeature from '../components/PremiumFeature';
 // import { supabase } from '../../lib/supabase';
 import { useUser } from '../../context/UserContext';
+import { ProgressChart } from 'react-native-chart-kit';
+
+const screenWidth = Dimensions.get('window').width;
 
 // Add more motivational quotes
 const motivationalQuotes = [
@@ -148,6 +151,16 @@ const HomeScreen = () => {
   const [workoutCompleted, setWorkoutCompleted] = useState(stats.today_workout_completed);
   const [mentalCompleted, setMentalCompleted] = useState(stats.today_mental_completed);
 
+  const activityData = {
+    labels: ["Workout", "Mental", "Water", "Calories"],
+    data: [
+      workoutCompleted ? 1 : 0,
+      mentalCompleted ? 1 : 0,
+      Math.min(water.consumed / (water.goal * 1000), 1),
+      Math.min(calories.consumed / calories.goal, 1)
+    ]
+  };
+
   // Update quote rotation with smooth transitions
   useEffect(() => {
     const rotateQuote = () => {
@@ -284,33 +297,80 @@ const HomeScreen = () => {
         <Text style={styles.quoteAuthor}>- {currentQuote.author}</Text>
       </Animated.View>
 
-      {/* Stats Grid */}
-      <View style={styles.statsGrid}>
-        <View style={styles.statsRow}>
-          <View style={[styles.statsCard, { width: '48%' }]}>
-            <Ionicons name="flame" size={24} color="#ff4444" />
-            <Text style={styles.statValue}>{stats.workouts || 0}</Text>
-            <Text style={styles.statLabel}>Workouts</Text>
-          </View>
-          <View style={[styles.statsCard, { width: '48%' }]}>
-            <Ionicons name="time" size={24} color="#4444ff" />
-            <Text style={styles.statValue}>{stats.minutes || 0}</Text>
-            <Text style={styles.statLabel}>Minutes</Text>
-          </View>
-        </View>
-        <View style={styles.statsRow}>
-          <View style={[styles.statsCard, { width: '48%' }]}>
-            <Ionicons name="leaf" size={24} color="#44ff44" />
-            <Text style={styles.statValue}>{stats.mental_sessions || 0}</Text>
-            <Text style={styles.statLabel}>Mental Sessions</Text>
-          </View>
-          <View style={[styles.statsCard, { width: '48%' }]}>
-            <Ionicons name="trophy" size={24} color="#ffff44" />
-            <Text style={styles.statValue}>{stats.prs_this_month || 0}</Text>
-            <Text style={styles.statLabel}>PRs This Month</Text>
-          </View>
+      {/* Activity Ring */}
+      <View style={{ alignItems: 'center', marginTop: 15, marginBottom: 5 }}>
+        <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: 'bold', marginBottom: 10, letterSpacing: 0.5 }}>
+          Daily Activity
+        </Text>
+        <View style={{ width: screenWidth - 60, height: 180, justifyContent: 'center', alignItems: 'center' }}>
+          {activityData.labels.map((label, index) => {
+            // Using neon colors for a vibrant look
+            const colors = [
+              '#ffff00', // Neon Yellow (Workout)
+              '#39ff14', // Neon Green (Mental)
+              '#00ffff', // Neon Blue (Water)
+              '#ff3131'  // Neon Red (Calories)
+            ];
+            const progress = activityData.data[index];
+            return (
+              <View key={label} style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                marginVertical: 8,
+                width: '100%',
+                justifyContent: 'space-between'
+              }}>
+                <Text style={{ 
+                  color: colors[index], 
+                  fontSize: 14, 
+                  fontWeight: 'bold',
+                  flex: 1
+                }}>
+                  {label}
+                </Text>
+                <View style={{ 
+                  flex: 2,
+                  height: 8,
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: 4,
+                  overflow: 'hidden',
+                  marginHorizontal: 12
+                }}>
+                  <View style={{ 
+                    width: `${progress * 100}%`,
+                    height: '100%',
+                    backgroundColor: colors[index],
+                    borderRadius: 4
+                  }} />
+                </View>
+                <Text style={{ 
+                  color: colors[index],
+                  fontSize: 12,
+                  fontWeight: 'bold',
+                  width: 45,
+                  textAlign: 'right'
+                }}>
+                  {`${Math.round(progress * 100)}%`}
+                </Text>
+              </View>
+            );
+          })}
         </View>
       </View>
+
+      {/* AI Trainer Banner */}
+      <TouchableOpacity 
+        style={styles.aiTrainerBanner}
+        onPress={() => router.push('/(tabs)/trainer')}
+      >
+        <View style={styles.aiTrainerContent}>
+          <View style={styles.aiTrainerText}>
+            <Text style={styles.aiTrainerTitle}>AI Personal Trainer</Text>
+            <Text style={styles.aiTrainerSubtitle}>Get personalized workout plans and guidance</Text>
+          </View>
+          <Ionicons name="fitness" size={32} color="#00ffff" />
+        </View>
+      </TouchableOpacity>
 
       {/* Mental Wellness Check */}
       <View style={styles.wellnessCard}>
@@ -318,7 +378,7 @@ const HomeScreen = () => {
           <Ionicons name="sad" size={24} color="#ffb6c1" />
           <View style={styles.wellnessText}>
             <Text style={styles.wellnessTitle}>Mental Wellness Check</Text>
-            <Text style={styles.wellnessSubtitle}>You're feeling {mood} today</Text>
+            <Text style={styles.wellnessSubtitle}>You're feeling {mood || 'neutral'} today</Text>
           </View>
         </View>
         <Text style={styles.wellnessDescription}>
@@ -563,7 +623,7 @@ const HomeScreen = () => {
             Alert.alert('Daily Reset', 'Forced daily reset complete. Check logs for details.');
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Force Daily Reset (DEV)</Text>
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Force Daily Reset</Text>
         </TouchableOpacity>
       )}
     </ScrollView>
@@ -744,25 +804,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '600',
   },
-  statsGrid: {
-    padding: 20,
-    paddingTop: 0,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  statsCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: 15,
-    padding: 15,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    height: 120,
-    justifyContent: 'center',
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -853,6 +894,34 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 20,
+  },
+  aiTrainerBanner: {
+    backgroundColor: 'rgba(0, 255, 255, 0.05)',
+    borderRadius: 20,
+    padding: 20,
+    margin: 20,
+    marginTop: 0,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 255, 0.1)',
+  },
+  aiTrainerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  aiTrainerText: {
+    flex: 1,
+    marginRight: 15,
+  },
+  aiTrainerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#00ffff',
+    marginBottom: 5,
+  },
+  aiTrainerSubtitle: {
+    fontSize: 14,
+    color: '#666',
   },
 });
 

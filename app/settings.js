@@ -30,7 +30,11 @@ const SettingsScreen = () => {
 
   const handleGoalEdit = async (type, value) => {
     try {
-      const numValue = parseFloat(value);
+      // For water, allow up to 1 decimal place
+      const numValue = type === 'water' 
+        ? parseFloat(parseFloat(value).toFixed(1))
+        : parseInt(value);
+        
       if (isNaN(numValue) || numValue <= 0) {
         Alert.alert('Invalid Value', 'Please enter a valid number greater than 0');
         return;
@@ -204,14 +208,19 @@ const SettingsScreen = () => {
               <Text style={styles.modalTitle}>
                 {editingField === 'calorie_goal' ? 'Edit Calorie Goal' : 'Edit Water Goal'}
               </Text>
-              <TextInput
-                style={styles.input}
-                value={editValue}
-                onChangeText={setEditValue}
-                keyboardType="numeric"
-                placeholder={editingField === 'calorie_goal' ? 'Enter calorie goal' : 'Enter water goal'}
-                placeholderTextColor="#666"
-              />
+              <View style={styles.modalInputContainer}>
+                <TextInput
+                  style={styles.modalInput}
+                  value={editValue}
+                  onChangeText={setEditValue}
+                  keyboardType="decimal-pad"
+                  placeholder={editingField === 'calorie_goal' ? 'Enter calorie goal' : 'Enter water goal'}
+                  placeholderTextColor="#666"
+                />
+                <Text style={styles.modalInputLabel}>
+                  {editingField === 'calorie_goal' ? 'calories' : 'L'}
+                </Text>
+              </View>
               <View style={styles.modalButtons}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.cancelButton]}
@@ -349,13 +358,23 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  input: {
+  modalInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  modalInput: {
     backgroundColor: '#222',
     borderRadius: 10,
     padding: 15,
     color: '#fff',
     fontSize: 16,
-    marginBottom: 15,
+    flex: 1,
+  },
+  modalInputLabel: {
+    fontSize: 16,
+    color: '#fff',
+    marginLeft: 10,
   },
   modalButtons: {
     flexDirection: 'row',

@@ -28,21 +28,49 @@ export default function NameEmailScreen() {
       return;
     }
 
-    // Store in Supabase session storage for later use
-    const { error: storageError } = await supabase
-      .from('onboarding_data')
-      .upsert({
-        id: (await supabase.auth.getSession()).data.session?.user.id,
-        full_name: fullName,
-        email: email,
-      });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        router.replace('/(auth)/login');
+        return;
+      }
 
-    if (storageError) {
-      setError('Failed to save data. Please try again.');
-      return;
+      // Create initial profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: session.user.id,
+          full_name: fullName,
+          email: email,
+          onboarding_completed: false
+        });
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+        setError('Failed to create profile. Please try again.');
+        return;
+      }
+
+      // Store in onboarding_data for later use
+      const { error: storageError } = await supabase
+        .from('onboarding_data')
+        .upsert({
+          id: session.user.id,
+          full_name: fullName,
+          email: email,
+        });
+
+      if (storageError) {
+        console.error('Error saving onboarding data:', storageError);
+        setError('Failed to save data. Please try again.');
+        return;
+      }
+
+      router.push('/(auth)/onboarding/age-weight');
+    } catch (error) {
+      console.error('Error in handleNext:', error);
+      setError('An unexpected error occurred. Please try again.');
     }
-
-    router.push('/(auth)/onboarding/age-weight');
   };
 
   return (

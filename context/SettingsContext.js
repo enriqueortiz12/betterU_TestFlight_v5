@@ -24,32 +24,11 @@ export const SettingsProvider = ({ children }) => {
       const { data, error } = await supabase
         .from('user_settings')
         .select('*')
-        .eq('profile_id', user.id)
+        .eq('id', user.id)
         .single();
 
       if (error) {
         console.error('Error loading settings:', error);
-        
-        // If settings don't exist, create them
-        if (error.code === 'PGRST116') {
-          const { data: newSettings, error: createError } = await supabase
-            .from('user_settings')
-            .insert([{ profile_id: user.id }])
-            .select()
-            .single();
-
-          if (createError) {
-            console.error('Error creating settings:', createError);
-            setIsLoading(false);
-            return;
-          }
-
-          setSettings(newSettings);
-          await AsyncStorage.setItem('userSettings', JSON.stringify(newSettings));
-          setIsLoading(false);
-          return;
-        }
-        
         setIsLoading(false);
         return;
       }
@@ -78,31 +57,11 @@ export const SettingsProvider = ({ children }) => {
       console.log('Updating settings for user:', user.id);
       console.log('New settings:', newSettings);
 
-      // If settings don't exist, create them first
-      if (!settings) {
-        console.log('Settings do not exist, creating new settings');
-        const { data: createdSettings, error: createError } = await supabase
-          .from('user_settings')
-          .insert([{ profile_id: user.id, ...newSettings }])
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('Error creating settings:', createError);
-          return { success: false, error: createError.message };
-        }
-
-        console.log('Created new settings:', createdSettings);
-        setSettings(createdSettings);
-        await AsyncStorage.setItem('userSettings', JSON.stringify(createdSettings));
-        return { success: true };
-      }
-
-      console.log('Updating existing settings');
+      // Always try to update first
       const { data: updatedSettings, error: updateError } = await supabase
         .from('user_settings')
         .update(newSettings)
-        .eq('profile_id', user.id)
+        .eq('id', user.id)
         .select()
         .single();
 
@@ -121,7 +80,7 @@ export const SettingsProvider = ({ children }) => {
     }
   };
 
-  // Load settings on mount
+  // Load settings when the component mounts
   useEffect(() => {
     loadSettings();
   }, []);

@@ -84,12 +84,12 @@ export default function GoalGenderScreen() {
       } else {
         // If data exists, update it
         const { error: updateError } = await supabase
-          .from('onboarding_data')
-          .update({
+        .from('onboarding_data')
+        .update({
             fitness_goals: [selectedGoal],
             gender: selectedGender
-          })
-          .eq('id', session.user.id);
+        })
+        .eq('id', session.user.id);
         storageError = updateError;
       }
 

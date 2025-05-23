@@ -20,7 +20,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.enriqueortiz.betteru",
-      buildNumber: "25",
+      buildNumber: "27",
       infoPlist: {
         NSCameraUsageDescription: "This app uses the camera to let you take profile pictures.",
         NSPhotoLibraryUsageDescription: "This app uses the photo library to let you select profile pictures.",

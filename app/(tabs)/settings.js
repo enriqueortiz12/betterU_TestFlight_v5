@@ -419,10 +419,10 @@ const SettingsScreen = () => {
           <View style={styles.modalContainer}>
             <View style={[styles.modalContent, { alignItems: 'center', padding: 20 }]}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
-                  {editingField === 'calorie_goal' ? 'Edit Calorie Goal' : 'Edit Water Goal'}
-                </Text>
-                <TouchableOpacity 
+              <Text style={styles.modalTitle}>
+                {editingField === 'calorie_goal' ? 'Edit Calorie Goal' : 'Edit Water Goal'}
+              </Text>
+                <TouchableOpacity
                   style={styles.modalCloseButton}
                   onPress={() => setEditingField(null)}
                 >
@@ -451,7 +451,7 @@ const SettingsScreen = () => {
                   )}
                 </Picker>
               </View>
-              <TouchableOpacity 
+                <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton, { marginTop: 20, width: '100%' }]} 
                 onPress={() => {
                   handleGoalEdit(
@@ -460,9 +460,9 @@ const SettingsScreen = () => {
                   );
                   setEditingField(null);
                 }}
-              >
+                >
                 <Text style={[styles.buttonText, { color: '#000' }]}>Save</Text>
-              </TouchableOpacity>
+                </TouchableOpacity>
             </View>
           </View>
         </Modal>

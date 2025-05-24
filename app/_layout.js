@@ -8,12 +8,40 @@ import { useState, useEffect } from 'react';
 import { preloadImages } from '../utils/imageUtils';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SettingsProvider } from '../context/SettingsContext';
+import TypingAnimation from './components/TypingAnimation';
+import IntroScreen from './components/IntroScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   const [loadingStep, setLoadingStep] = useState('Initializing...');
   const [error, setError] = useState(null);
   const [contextsReady, setContextsReady] = useState(false);
+  const [showTyping, setShowTyping] = useState(true);
+  const [showIntro, setShowIntro] = useState(true);
+
+  useEffect(() => {
+    const checkIntroStatus = async () => {
+      try {
+        const hasSeenIntro = await AsyncStorage.getItem('hasSeenIntro');
+        if (hasSeenIntro === 'true') {
+          setShowIntro(false);
+        }
+      } catch (error) {
+        console.error('Error checking intro status:', error);
+      }
+    };
+    checkIntroStatus();
+  }, []);
+
+  const handleIntroComplete = async () => {
+    try {
+      await AsyncStorage.setItem('hasSeenIntro', 'true');
+      setShowIntro(false);
+    } catch (error) {
+      console.error('Error saving intro status:', error);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -58,7 +86,7 @@ export default function RootLayout() {
         });
         
         if (isMounted) {
-      setIsReady(true);
+          setIsReady(true);
           setError(null);
         }
       } catch (error) {
@@ -81,18 +109,33 @@ export default function RootLayout() {
     };
   }, [contextsReady]);
 
+  if (showIntro) {
+    return (
+      <SafeAreaProvider>
+        <IntroScreen onComplete={handleIntroComplete} />
+      </SafeAreaProvider>
+    );
+  }
+  
   if (!isReady) {
     return (
       <SafeAreaProvider>
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#00ffff" />
-          <Text style={styles.loadingText}>{loadingStep}</Text>
+        <View style={styles.container}>
+          <ActivityIndicator size="large" color="#00ffff" />
+          {showTyping ? (
+            <TypingAnimation 
+              text="BetterU"
+              onComplete={() => setShowTyping(false)}
+            />
+          ) : (
+            <Text style={styles.loadingText}>{loadingStep}</Text>
+          )}
           {error && (
             <Text style={styles.errorText}>
               {error}
             </Text>
           )}
-      </View>
+        </View>
       </SafeAreaProvider>
     );
   }
@@ -105,11 +148,11 @@ export default function RootLayout() {
           setContextsReady(true);
         }}>
           <SettingsProvider>
-          <UnitsProvider>
-            <TrackingProvider>
-              <Slot />
-            </TrackingProvider>
-          </UnitsProvider>
+            <UnitsProvider>
+              <TrackingProvider>
+                <Slot />
+              </TrackingProvider>
+            </UnitsProvider>
           </SettingsProvider>
         </UserProvider>
       </AuthProvider>
@@ -136,4 +179,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20
   }
-}); 
+});
